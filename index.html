@@ -1,0 +1,239 @@
+<!-- 在<head>标签内添加Supabase客户端 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+// 配置Supabase（需替换为你的项目信息）
+const supabase = supabase.createClient(
+  'https://wenvirapddldhhfnhtxv.supabase.co',  // 你的项目URL
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w'  // 你的公开密钥
+);
+
+// 应用状态管理
+const App = {
+  config: {
+    // 获取密码
+    async getPassword() {
+      const { data, error } = await supabase
+        .from('passwords')
+        .select('password')
+        .single();
+      
+      return error ? 'admin123' : data.password;
+    },
+
+    // 设置密码
+    async setPassword(newPassword) {
+      await supabase.from('passwords').delete().neq('id', '');
+      const { error } = await supabase
+        .from('passwords')
+        .insert([{ password: newPassword }]);
+      
+      return !error;
+    },
+
+    // 获取主题
+    async getThemes() {
+      const { data, error } = await supabase
+        .from('themes')
+        .select('*')
+        .order('created_at', { ascending: true });
+      
+      return error ? [] : data;
+    },
+
+    // 保存主题
+    async saveThemes(themes) {
+      await supabase.from('themes').delete().neq('id', '');
+      const { error } = await supabase
+        .from('themes')
+        .insert(themes);
+      
+      return !error;
+    }
+  },
+  state: {
+    currentStep: 0,
+    selections: {},
+    promptLines: []
+  }
+};
+
+// 核心功能模块
+const Core = {
+  async init() {
+    this.resetAppState();
+    if(location.hash === '#admin') {
+      this.showLoginPanel();
+    } else {
+      document.getElementById('frontend').classList.remove('hidden');
+      await UI.initFrontend();
+      if((await App.config.getThemes()).length === 0) {
+        await this.loadSampleThemes();
+      }
+    }
+  },
+
+  async loadSampleThemes() {
+    const sampleTheme = {
+      name: '風格',
+      options: ['卡通風格', '寫實風格'],
+      allow_custom: true,
+      is_text_input: false
+    };
+    await supabase.from('themes').insert([sampleTheme]);
+    UI.initFrontend();
+  },
+
+  // ... 其他方法保持原样 ...
+};
+
+// 前台界面模块
+const UI = {
+  async initFrontend() {
+    const themes = await App.config.getThemes();
+    this.renderThemeNav(themes);
+    this.renderCurrentStep(themes);
+  },
+
+  async renderThemeNav() {
+    const themes = await App.config.getThemes();
+    const navContainer = document.getElementById('themeNav');
+    navContainer.innerHTML = themes.map((theme, index) => `
+      <div class="theme-nav-item ${index === App.state.currentStep ? 'active' : ''}" 
+           onclick="UI.jumpToStep(${index})">
+        ${theme.name}
+      </div>
+    `).join('');
+  },
+
+  // ... 其他方法保持原样 ...
+};
+
+// 后台管理模块
+const Admin = {
+  async login() {
+    const inputPassword = document.getElementById('password').value;
+    const realPassword = await App.config.getPassword();
+    
+    if(inputPassword === realPassword) {
+      document.getElementById('loginPanel').classList.add('hidden');
+      document.getElementById('adminPanel').classList.remove('hidden');
+      await this.refreshThemeList();
+      this.initSortable();
+    } else {
+      alert('密碼錯誤！');
+      document.getElementById('password').value = '';
+    }
+  },
+
+  async saveTheme() {
+    const newTheme = {
+      name: document.getElementById('newThemeName').value.trim(),
+      options: document.getElementById('newThemeOptions').value
+        .split('\n')
+        .map(o => o.trim())
+        .filter(o => o),
+      allow_custom: document.getElementById('allowCustom').checked,
+      is_text_input: document.getElementById('isTextInput').checked
+    };
+
+    if (!newTheme.name) {
+      alert('請輸入主題名稱！');
+      return;
+    }
+    
+    if (newTheme.is_text_input) {
+      newTheme.options = [];
+    } else if (newTheme.options.length === 0) {
+      alert('請輸入至少一個選項！');
+      return;
+    }
+
+    const { error } = await supabase.from('themes').insert([newTheme]);
+    if(error) {
+      alert('保存失败: ' + error.message);
+      return;
+    }
+
+    this.clearNewThemeForm();
+    await this.refreshThemeList();
+    alert('主題保存成功！');
+  },
+
+  async refreshThemeList() {
+    const { data: themes } = await supabase.from('themes').select('*');
+    const container = document.getElementById('existingThemes');
+    container.innerHTML = themes.map(theme => `
+      <div class="theme-block" data-id="${theme.id}">
+        <div class="theme-management">
+          <input type="text" value="${theme.name}" id="name_${theme.id}">
+          ${theme.is_text_input ? '' : `
+            <textarea id="options_${theme.id}" rows="3">${theme.options?.join('\n') || ''}</textarea>
+          `}
+          <div class="option-settings">
+            <label>
+              <input type="checkbox" id="allowCustom_${theme.id}" 
+                     ${theme.allow_custom ? 'checked' : ''} 
+                     ${theme.is_text_input ? 'disabled' : ''}>
+              允許自定義
+            </label>
+            <label>
+              <input type="checkbox" id="isTextInput_${theme.id}" 
+                     ${theme.is_text_input ? 'checked' : ''}>
+              純文字模式
+            </label>
+          </div>
+          <div class="admin-btn-group">
+            <button onclick="Admin.updateTheme('${theme.id}')">更新</button>
+            <button onclick="Admin.deleteTheme('${theme.id}')">刪除</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  async updateTheme(id) {
+    const themeIndex = (await App.config.getThemes()).findIndex(t => t.id === id);
+    if(themeIndex === -1) return;
+
+    const updatedTheme = {
+      id: id,
+      name: document.getElementById(`name_${id}`).value.trim(),
+      options: document.getElementById(`options_${id}`)?.value
+        .split('\n')
+        .map(o => o.trim())
+        .filter(o => o) || [],
+      allow_custom: document.getElementById(`allowCustom_${id}`).checked,
+      is_text_input: document.getElementById(`isTextInput_${id}`).checked
+    };
+
+    const { error } = await supabase
+      .from('themes')
+      .update(updatedTheme)
+      .eq('id', id);
+
+    if(!error) {
+      alert('主題更新成功！');
+      this.refreshThemeList();
+    }
+  },
+
+  async deleteTheme(id) {
+    if(confirm('確定要永久刪除此主題？')) {
+      const { error } = await supabase
+        .from('themes')
+        .delete()
+        .eq('id', id);
+      
+      if(!error) {
+        await this.refreshThemeList();
+        UI.initFrontend();
+        alert('主題已刪除！');
+      }
+    }
+  }
+};
+
+// 初始化应用
+document.addEventListener('DOMContentLoaded', () => Core.init());
+</script>
