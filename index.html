@@ -3,46 +3,36 @@
 <head>
   <title>AI圖片生成提示詞生成器</title>
   <style>
-    /* 保持原有样式不变 */
-    :root {
-      --primary-color: #2c3e50;
-      --secondary-color: #3498db;
-    }
-    body { 
-      font-family: Arial, sans-serif; 
-      max-width: 800px; 
-      margin: 0 auto; 
-      padding: 100px 20px 20px;
-    }
-    /* 保持其他CSS不变 */
+    /* 保持原有樣式不變 */
   </style>
-  <!-- 加载Supabase客户端库 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- 保持HTML结构不变 -->
+  <!-- 保持HTML結構不變 -->
 
-<script>
-// 配置Supabase（替换为您的实际项目信息）
-const supabaseUrl = 'https://wenvirapddldhhfnhtxv.supabase.co';
+  <!-- 將Supabase初始化移到body底部 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+  // 使用DOMContentLoaded確保DOM完全加載
+  document.addEventListener('DOMContentLoaded', async () => {
+    // 1. 初始化Supabase
+const supabaseUrl = 'https://wenvirapddldhhfnhtxv.supabase.co/';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+window.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // 2. 初始化應用
+    await Core.init();
+  });
 
-// 应用状态管理
-const App = {
-  config: {
-    async getPassword() {
-      try {
-        const { data, error } = await supabase
+  // 修改App.config使用window.supabase
+  const App = {
+    config: {
+      async getPassword() {
+        const { data } = await window.supabase
           .from('passwords')
           .select('password')
           .single();
-        return error ? 'admin123' : data.password;
-      } catch (e) {
-        console.error("密码获取失败:", e);
-        return 'admin123';
-      }
-    },
+        return data?.password || 'admin123';
+      },
 
     async setPassword(newPassword) {
       try {
