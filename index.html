@@ -2,7 +2,7 @@
 <html>
 <head>
   <title>AI圖片生成提示詞生成器</title>
-  <link rel="icon" href="data:,"> <!-- 解决favicon.ico 404错误 -->
+  <link rel="icon" href="data:,"> <!-- 完全消除favicon请求 -->
   <style>
     /* 保持原有样式不变 */
     :root {
@@ -104,6 +104,7 @@
       font-size: 1.5em;
     }
   </style>
+  <!-- 优先加载Supabase客户端库 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -172,14 +173,21 @@
 
 <script>
 // 初始化Supabase客户端
-const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co'; // 替换为你的URL
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';                // 替换为你的密钥
+const initializeApp = async () => {
+  // 配置参数
+  const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co'; // 替换为你的URL
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';                // 替换为你的密钥
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // 确保supabase库已加载
+  if (typeof supabase === 'undefined') {
+    console.error('Supabase库未正确加载');
+    return;
+  }
 
-// 事件监听统一配置
-document.addEventListener('DOMContentLoaded', async () => {
-  // 按钮事件绑定
+  // 创建客户端实例
+  window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 初始化事件监听
   document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
   document.getElementById('loginBtn').addEventListener('click', Admin.login);
   document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
@@ -190,40 +198,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('saveThemeBtn').addEventListener('click', Admin.saveTheme);
   document.getElementById('changePasswordBtn').addEventListener('click', Admin.changePassword);
 
-  // 初始化应用
+  // 启动应用
   await Core.init();
-});
+};
 
 // 应用状态管理
 const App = {
   config: {
     async getPassword() {
       try {
-        const { data } = await supabase.from('passwords').select('password').single();
-        return data?.password || 'admin123';
+        const { data, error } = await supabase
+          .from('passwords')
+          .select('password')
+          .single();
+        
+        if (error) throw error;
+        return data.password;
       } catch (error) {
-        console.error('获取密码失败:', error);
-        return 'admin123';
+        console.error('密码获取失败:', error);
+        return 'admin123'; // 默认密码
       }
     },
 
     async setPassword(newPassword) {
       try {
-        await supabase.from('passwords').delete().neq('id', '');
-        const { error } = await supabase.from('passwords').insert([{ password: newPassword }]);
-        return !error;
+        // 清空旧密码
+        const { error: deleteError } = await supabase
+          .from('passwords')
+          .delete()
+          .neq('id', '');
+
+        if (deleteError) throw deleteError;
+
+        // 插入新密码
+        const { error: insertError } = await supabase
+          .from('passwords')
+          .insert([{ password: newPassword }]);
+
+        return !insertError;
       } catch (error) {
-        console.error('设置密码失败:', error);
+        console.error('密码设置失败:', error);
         return false;
       }
     },
 
     async getThemes() {
       try {
-        const { data } = await supabase.from('themes').select('*').order('created_at');
-        return data || [];
+        const { data, error } = await supabase
+          .from('themes')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data;
       } catch (error) {
-        console.error('获取主题失败:', error);
+        console.error('主题获取失败:', error);
         return [];
       }
     }
@@ -238,28 +267,36 @@ const App = {
 // 核心功能模块
 const Core = {
   async init() {
-    this.resetAppState();
-    if(location.hash === '#admin') {
-      this.showLoginPanel();
-    } else {
-      document.getElementById('frontend').classList.remove('hidden');
-      await UI.initFrontend();
-      const themes = await App.config.getThemes();
-      if(themes.length === 0) await this.loadSampleThemes();
+    try {
+      this.resetAppState();
+      if(location.hash === '#admin') {
+        this.showLoginPanel();
+      } else {
+        document.getElementById('frontend').classList.remove('hidden');
+        await UI.initFrontend();
+        const themes = await App.config.getThemes();
+        if(themes.length === 0) await this.loadSampleThemes();
+      }
+    } catch (error) {
+      console.error('应用初始化失败:', error);
     }
   },
 
   async loadSampleThemes() {
     try {
-      await supabase.from('themes').insert([{
-        name: '風格',
-        options: ['卡通風格', '寫實風格'],
-        allow_custom: true,
-        is_text_input: false
-      }]);
-      UI.initFrontend();
+      const { error } = await supabase
+        .from('themes')
+        .insert([{
+          name: '風格',
+          options: ['卡通風格', '寫實風格'],
+          allow_custom: true,
+          is_text_input: false
+        }]);
+
+      if (error) throw error;
+      await UI.initFrontend();
     } catch (error) {
-      console.error('初始化示例主题失败:', error);
+      console.error('示例主题初始化失败:', error);
     }
   },
 
@@ -283,21 +320,28 @@ const Core = {
       selections: {},
       promptLines: []
     };
+    UI.clearResult();
   }
 };
 
 // 前台界面模块
 const UI = {
   async initFrontend() {
-    const themes = await App.config.getThemes();
-    this.renderThemeNav(themes);
-    this.renderCurrentStep(themes);
+    try {
+      const themes = await App.config.getThemes();
+      this.renderThemeNav(themes);
+      this.renderCurrentStep(themes);
+    } catch (error) {
+      console.error('前台初始化失败:', error);
+    }
   },
 
   renderThemeNav: async (themes) => {
     const navContainer = document.getElementById('themeNav');
-    navContainer.innerHTML = themes.map((_, index) => `
-      <div class="theme-nav-item ${index === App.state.currentStep ? 'active' : ''}">${_.name}</div>
+    navContainer.innerHTML = themes.map((theme, index) => `
+      <div class="theme-nav-item ${index === App.state.currentStep ? 'active' : ''}">
+        ${theme.name}
+      </div>
     `).join('');
 
     // 动态绑定点击事件
@@ -306,7 +350,7 @@ const UI = {
     });
   },
 
-  // ... 其他方法保持原样但添加错误处理 ...
+  // ... 其他方法保持不变，需添加错误处理 ...
 };
 
 // 后台管理模块
@@ -327,8 +371,15 @@ const Admin = {
       console.error('登录失败:', error);
     }
   },
-  // ... 其他方法保持原样但添加错误处理 ...
+  // ... 其他方法保持不变，需添加错误处理 ...
 };
+
+// 启动应用
+document.addEventListener('DOMContentLoaded', () => {
+  initializeApp().catch(error => {
+    console.error('应用启动失败:', error);
+  });
+});
 </script>
 </body>
 </html>
