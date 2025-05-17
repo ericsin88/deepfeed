@@ -105,9 +105,9 @@
       font-size: 1.5em;
     }
     .login-panel button {
+      margin-top: 10px;
       padding: 8px 15px;
-      margin: 5px;
-      cursor: pointer;
+      width: 100%;
     }
   </style>
   <!-- 先加载Supabase库 -->
@@ -116,7 +116,7 @@
 <body>
   <div class="header">
     <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" class="logo" alt="AI Generator Logo">
-    <button id="adminEntry">進入後台管理</button>
+    <button id="adminEntry" onclick="Core.showLoginPanel()">進入後台管理</button>
   </div>
   <h1 class="title">AI圖片/動畫提示詞生成器</h1>
 
@@ -136,10 +136,8 @@
   <div id="loginPanel" class="hidden login-panel">
     <h2>後台管理登入</h2>
     <input type="password" id="password" placeholder="輸入密碼">
-    <div style="margin-top:15px;display:flex;justify-content:center">
-      <button onclick="Admin.login()">登入</button>
-      <button onclick="Core.hideLoginPanel()">取消</button>
-    </div>
+    <button onclick="Admin.login()">登入</button>
+    <button onclick="Core.backToFrontend()">取消</button>
   </div>
 
   <!-- 後台管理 -->
@@ -187,40 +185,66 @@ const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 // 应用状态管理
 const App = {
   config: {
+    // 获取密码
     async getPassword() {
-      const { data, error } = await supabase
-        .from('passwords')
-        .select('password')
-        .single();
-      
-      return error ? 'admin123' : data.password;
+      try {
+        const { data, error } = await supabase
+          .from('passwords')
+          .select('password')
+          .single();
+        
+        if(error) throw error;
+        return data.password || 'admin123';
+      } catch (error) {
+        console.error('获取密码失败:', error);
+        return 'admin123';
+      }
     },
 
+    // 设置密码
     async setPassword(newPassword) {
-      await supabase.from('passwords').delete().neq('id', '');
-      const { error } = await supabase
-        .from('passwords')
-        .insert([{ password: newPassword }]);
-      
-      return !error;
+      try {
+        await supabase.from('passwords').delete().neq('id', '');
+        const { error } = await supabase
+          .from('passwords')
+          .insert([{ password: newPassword }]);
+        
+        return !error;
+      } catch (error) {
+        console.error('设置密码失败:', error);
+        return false;
+      }
     },
 
+    // 获取主题
     async getThemes() {
-      const { data, error } = await supabase
-        .from('themes')
-        .select('*')
-        .order('created_at', { ascending: true });
-      
-      return error ? [] : data;
+      try {
+        const { data, error } = await supabase
+          .from('themes')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if(error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error('获取主题失败:', error);
+        return [];
+      }
     },
 
+    // 保存主题
     async saveThemes(themes) {
-      await supabase.from('themes').delete().neq('id', '');
-      const { error } = await supabase
-        .from('themes')
-        .insert(themes);
-      
-      return !error;
+      try {
+        await supabase.from('themes').delete().neq('id', '');
+        const { error } = await supabase
+          .from('themes')
+          .insert(themes);
+        
+        return !error;
+      } catch (error) {
+        console.error('保存主题失败:', error);
+        return false;
+      }
     }
   },
   state: {
@@ -233,9 +257,6 @@ const App = {
 // 核心功能模块
 const Core = {
   async init() {
-    // 绑定后台管理按钮事件
-    document.getElementById('adminEntry').addEventListener('click', this.showLoginPanel);
-    
     this.resetAppState();
     if(location.hash === '#admin') {
       this.showLoginPanel();
@@ -249,16 +270,21 @@ const Core = {
     }
   },
 
-  showLoginPanel() {
-    document.getElementById('frontend').classList.add('hidden');
-    document.getElementById('adminPanel').classList.add('hidden');
-    document.getElementById('loginPanel').classList.remove('hidden');
-    document.getElementById('password').value = '';
+  async loadSampleThemes() {
+    const sampleTheme = {
+      name: '風格',
+      options: ['卡通風格', '寫實風格'],
+      allow_custom: true,
+      is_text_input: false
+    };
+    await supabase.from('themes').insert([sampleTheme]);
+    await UI.initFrontend();
   },
 
-  hideLoginPanel() {
-    document.getElementById('loginPanel').classList.add('hidden');
-    document.getElementById('frontend').classList.remove('hidden');
+  showLoginPanel() {
+    document.getElementById('frontend').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+    document.getElementById('password').value = '';
   },
 
   backToFrontend() {
@@ -277,21 +303,6 @@ const Core = {
       selections: {},
       promptLines: []
     };
-  },
-
-  async loadSampleThemes() {
-    const sampleTheme = {
-      name: '風格',
-      options: ['卡通風格', '寫實風格'],
-      allow_custom: true,
-      is_text_input: false
-    };
-    await supabase.from('themes').insert([sampleTheme]);
-    await UI.initFrontend();
-  },
-
-  generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
   }
 };
 
@@ -387,13 +398,12 @@ const UI = {
     App.state.selections[themeId] = [inputElement.value.trim()];
   },
 
-  prevStep() {
+  async prevStep() {
     if(App.state.currentStep > 0) {
       App.state.currentStep--;
-      App.config.getThemes().then(themes => {
-        this.renderCurrentStep(themes);
-        this.renderThemeNav(themes);
-      });
+      const themes = await App.config.getThemes();
+      this.renderCurrentStep(themes);
+      this.renderThemeNav(themes);
     }
   },
 
@@ -445,23 +455,22 @@ const UI = {
     App.state.selections[theme.id] = selections;
   },
 
-  showResult() {
-    App.config.getThemes().then(themes => {
-      App.state.promptLines = themes
-        .filter(theme => {
-          const selections = App.state.selections[theme.id];
-          return selections && selections.length > 0 && selections[0] !== '';
-        })
-        .map(theme => `${theme.name}: ${App.state.selections[theme.id].join(', ')}`);
+  async showResult() {
+    const themes = await App.config.getThemes();
+    App.state.promptLines = themes
+      .filter(theme => {
+        const selections = App.state.selections[theme.id];
+        return selections && selections.length > 0 && selections[0] !== '';
+      })
+      .map(theme => `${theme.name}: ${App.state.selections[theme.id].join(', ')}`);
 
-      document.getElementById('result').innerHTML = `
-        <h3>生成的Prompt:</h3>
-        <pre>${App.state.promptLines.join('\n') || '未選擇任何選項'}</pre>
-        <div class="button-group">
-          <button onclick="UI.copyPrompt()">複製Prompt</button>
-          <button onclick="Core.backToFrontend()">重新開始</button>
-        </div>`;
-    });
+    document.getElementById('result').innerHTML = `
+      <h3>生成的Prompt:</h3>
+      <pre>${App.state.promptLines.join('\n') || '未選擇任何選項'}</pre>
+      <div class="button-group">
+        <button onclick="UI.copyPrompt()">複製Prompt</button>
+        <button onclick="Core.backToFrontend()">重新開始</button>
+      </div>`;
   },
 
   copyPrompt() {
@@ -475,7 +484,10 @@ const UI = {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(copyText)
         .then(() => alert('已成功複製到剪貼簿！'))
-        .catch(err => this.fallbackCopy(copyText));
+        .catch(err => {
+          console.error('複製失敗:', err);
+          this.fallbackCopy(copyText);
+        });
     } else {
       this.fallbackCopy(copyText);
     }
@@ -511,7 +523,6 @@ const Admin = {
     if(inputPassword === realPassword) {
       document.getElementById('loginPanel').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
-      document.getElementById('frontend').classList.add('hidden');
       await this.refreshThemeList();
       this.initSortable();
     } else {
