@@ -72,6 +72,7 @@
       background: white;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
       z-index: 1000;
+      width: 300px;
     }
     .text-input-mode input[type="text"] {
       width: 100%;
@@ -79,10 +80,12 @@
       margin-top: 5px;
     }
     #adminEntry {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
+      padding: 8px 15px;
+      background: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
     }
     .dragging {
       opacity: 0.5;
@@ -101,6 +104,11 @@
       transform: translateX(-50%);
       font-size: 1.5em;
     }
+    .login-panel button {
+      padding: 8px 15px;
+      margin: 5px;
+      cursor: pointer;
+    }
   </style>
   <!-- 先加载Supabase库 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -108,7 +116,7 @@
 <body>
   <div class="header">
     <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" class="logo" alt="AI Generator Logo">
-    <button id="adminEntry" onclick="Core.showLoginPanel()">進入後台管理</button>
+    <button id="adminEntry">進入後台管理</button>
   </div>
   <h1 class="title">AI圖片/動畫提示詞生成器</h1>
 
@@ -128,8 +136,10 @@
   <div id="loginPanel" class="hidden login-panel">
     <h2>後台管理登入</h2>
     <input type="password" id="password" placeholder="輸入密碼">
-    <button onclick="Admin.login()">登入</button>
-    <button onclick="Core.backToFrontend()">取消</button>
+    <div style="margin-top:15px;display:flex;justify-content:center">
+      <button onclick="Admin.login()">登入</button>
+      <button onclick="Core.hideLoginPanel()">取消</button>
+    </div>
   </div>
 
   <!-- 後台管理 -->
@@ -170,7 +180,7 @@
 
 <script>
 // 初始化Supabase客户端
-const supabaseUrl = 'https://wenvirapddldhhfnhtxv.supabase.co;  // 替换为你的Supabase URL
+const supabaseUrl = 'https://wenvirapddldhhfnhtxv.supabase.co';  // 替换为你的Supabase URL
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';                   // 替换为你的anon key
 const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
@@ -223,6 +233,9 @@ const App = {
 // 核心功能模块
 const Core = {
   async init() {
+    // 绑定后台管理按钮事件
+    document.getElementById('adminEntry').addEventListener('click', this.showLoginPanel);
+    
     this.resetAppState();
     if(location.hash === '#admin') {
       this.showLoginPanel();
@@ -236,21 +249,16 @@ const Core = {
     }
   },
 
-  async loadSampleThemes() {
-    const sampleTheme = {
-      name: '風格',
-      options: ['卡通風格', '寫實風格'],
-      allow_custom: true,
-      is_text_input: false
-    };
-    await supabase.from('themes').insert([sampleTheme]);
-    await UI.initFrontend();
-  },
-
   showLoginPanel() {
     document.getElementById('frontend').classList.add('hidden');
+    document.getElementById('adminPanel').classList.add('hidden');
     document.getElementById('loginPanel').classList.remove('hidden');
     document.getElementById('password').value = '';
+  },
+
+  hideLoginPanel() {
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('frontend').classList.remove('hidden');
   },
 
   backToFrontend() {
@@ -269,6 +277,17 @@ const Core = {
       selections: {},
       promptLines: []
     };
+  },
+
+  async loadSampleThemes() {
+    const sampleTheme = {
+      name: '風格',
+      options: ['卡通風格', '寫實風格'],
+      allow_custom: true,
+      is_text_input: false
+    };
+    await supabase.from('themes').insert([sampleTheme]);
+    await UI.initFrontend();
   },
 
   generateId() {
@@ -453,7 +472,6 @@ const UI = {
 
     const copyText = App.state.promptLines.join('; ');
     
-    // 使用现代API优先，兼容旧方法
     if (navigator.clipboard) {
       navigator.clipboard.writeText(copyText)
         .then(() => alert('已成功複製到剪貼簿！'))
@@ -493,6 +511,7 @@ const Admin = {
     if(inputPassword === realPassword) {
       document.getElementById('loginPanel').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
+      document.getElementById('frontend').classList.add('hidden');
       await this.refreshThemeList();
       this.initSortable();
     } else {
@@ -720,6 +739,14 @@ document.addEventListener('DOMContentLoaded', () => {
     Core.init();
   } else {
     console.error('Supabase未正确加载');
+    // 备用初始化方案
+    setTimeout(() => {
+      if(typeof supabase !== 'undefined') {
+        Core.init();
+      } else {
+        alert('系统初始化失败，请刷新页面');
+      }
+    }, 500);
   }
 });
 </script>
