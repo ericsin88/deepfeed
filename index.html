@@ -108,7 +108,7 @@ const App = {
 
   async loadThemes() {
     try {
-      const { data } = await supabase.from('themes').select('*').order('order');
+      const { data } = await window.supabase.from('themes').select('*').order('order');
       this.themes = data || [];
     } catch (error) {
       console.error('載入主題失敗:', error);
@@ -117,7 +117,7 @@ const App = {
 
   async loadPassword() {
     try {
-      const { data } = await supabase.from('passwords').select('password').single();
+      const { data } = await window.supabase.from('passwords').select('password').single();
       if (data) this.password = data.password;
     } catch (error) {
       console.error('載入密碼失敗:', error);
@@ -253,7 +253,7 @@ const UI = {
 const Admin = {
   async loadExistingThemes() {
     try {
-      const { data } = await supabase.from('themes').select('*');
+      const { data } = await window.supabase.from('themes').select('*');
       const container = document.getElementById('existingThemes');
       container.innerHTML = data.map(theme => `
         <div class="theme-block">
@@ -269,7 +269,7 @@ const Admin = {
 
   async saveTheme(theme) {
     try {
-      const { error } = await supabase.from('themes').insert(theme);
+      const { error } = await window.supabase.from('themes').insert(theme);
       if (error) throw error;
       alert('保存成功！');
       return true;
@@ -281,7 +281,7 @@ const Admin = {
 
   async deleteTheme(id) {
     try {
-      const { error } = await supabase.from('themes').delete().eq('id', id);
+      const { error } = await window.supabase.from('themes').delete().eq('id', id);
       if (!error) this.loadExistingThemes();
     } catch (error) {
       console.error('刪除失敗:', error);
@@ -290,7 +290,7 @@ const Admin = {
 
   async updatePassword(newPass) {
     try {
-      const { error } = await supabase.from('passwords')
+      const { error } = await window.supabase.from('passwords')
         .upsert({ id: 1, password: newPass });
       return !error;
     } catch (error) {
