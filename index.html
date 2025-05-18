@@ -2,19 +2,174 @@
 <html>
 <head>
   <title>AI圖片生成提示詞生成器</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="data:,"> <!-- 完全消除favicon请求 -->
   <style>
     /* 保持原有样式不变 */
-    :root { --primary-color: #2c3e50; --secondary-color: #3498db; }
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 100px 20px 20px; }
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+    }
+    body { 
+      font-family: Arial, sans-serif; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 100px 20px 20px;
+    }
     .hidden { display: none; }
-    .header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 10px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; }
-    /* 其他样式保持不变... */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 10px 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      height: 40px;
+      width: auto;
+    }
+    .theme-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 70px 0 20px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 5px;
+    }
+    .theme-nav-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+    .theme-nav-item.active {
+      background: var(--secondary-color);
+      color: white;
+    }
+    .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .option { margin: 5px; padding: 8px 12px; display: inline-block; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; }
+    .option:hover { background: #f8f9fa; }
+    #adminPanel { background: #f8f9fa; padding: 20px; margin-top: 30px; border-radius: 5px; }
+    .theme-block { 
+      margin: 15px 0; 
+      padding: 15px; 
+      background: white; 
+      border-radius: 5px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      cursor: move;
+      transition: opacity 0.3s;
+    }
+    .login-panel { 
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    .text-input-mode input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+    }
+    #adminEntry {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .dragging {
+      opacity: 0.5;
+      border: 2px dashed var(--secondary-color);
+    }
+    .button-group {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5em;
+    }
   </style>
+  <!-- 优先加载Supabase客户端库 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- 页面结构保持不变... -->
+  <div class="header">
+    <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" 
+         class="logo" alt="Logo">
+    <button id="adminEntry">進入後台管理</button>
+  </div>
+  <h1 class="title">AI圖片/動畫提示詞生成器</h1>
+
+  <!-- 前台界面 -->
+  <div id="frontend">
+    <div class="theme-nav" id="themeNav"></div>
+    <div id="steps"></div>
+    <div class="button-group">
+      <button id="prevBtn">上一步</button>
+      <button id="nextBtn">下一步</button>
+      <button id="generateBtn">直接生成</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <!-- 登入面板 -->
+  <div id="loginPanel" class="hidden login-panel">
+    <h2>後台管理登入</h2>
+    <input type="password" id="password" placeholder="輸入密碼">
+    <button id="loginBtn">登入</button>
+    <button id="cancelBtn">取消</button>
+  </div>
+
+  <!-- 後台管理 -->
+  <div id="adminPanel" class="hidden">
+    <button id="backToFrontBtn">返回前台</button>
+    
+    <!-- 修改密碼板塊 -->
+    <div class="theme-block">
+      <h3>修改管理密碼</h3>
+      <input type="password" id="oldPassword" placeholder="舊密碼">
+      <input type="password" id="newPassword" placeholder="新密碼">
+      <input type="password" id="confirmPassword" placeholder="確認新密碼">
+      <button id="changePasswordBtn">修改密碼</button>
+    </div>
+
+    <!-- 主題管理 -->
+    <div class="theme-block">
+      <h3>新增主題</h3>
+      <div class="theme-management">
+        <input type="text" id="newThemeName" placeholder="主題名稱">
+        <textarea id="newThemeOptions" placeholder="輸入選項（每行一個）" rows="5"></textarea>
+        <div class="option-settings">
+          <label>
+            <input type="checkbox" id="allowCustom"> 允許自定義輸入
+          </label>
+          <label>
+            <input type="checkbox" id="isTextInput"> 純文字輸入模式
+          </label>
+        </div>
+        <button id="saveThemeBtn">保存新主題</button>
+      </div>
+    </div>
+
+    <div id="existingThemes">
+      <h3>現有主題管理（拖動排序）</h3>
+    </div>
+  </div>
 
 <script>
 // 初始化Supabase客户端
