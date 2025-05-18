@@ -4,6 +4,7 @@
   <title>AI圖片生成提示詞生成器</title>
   <link rel="icon" href="data:,">
   <style>
+    /* 保持原有样式不变 */
     :root { --primary-color: #2c3e50; --secondary-color: #3498db; }
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 100px 20px 20px; }
     .hidden { display: none; }
@@ -90,24 +91,52 @@
   </div>
 
 <script>
-// 配置Supabase客户端
+// 初始化Supabase客户端
 const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';
 
-// 创建Supabase客户端实例
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabaseClient = null;
+
+const initializeApp = async () => {
+  try {
+    // 创建客户端实例
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window.supabase = supabaseClient;
+
+    // 初始化事件监听
+    document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
+    document.getElementById('loginBtn').addEventListener('click', Admin.login);
+    document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
+    document.getElementById('backToFrontBtn').addEventListener('click', Core.backToFrontend);
+    document.getElementById('prevBtn').addEventListener('click', UI.prevStep);
+    document.getElementById('nextBtn').addEventListener('click', UI.nextStep);
+    document.getElementById('generateBtn').addEventListener('click', UI.generateNow);
+    document.getElementById('saveThemeBtn').addEventListener('click', Admin.saveTheme);
+    document.getElementById('changePasswordBtn').addEventListener('click', Admin.changePassword);
+
+    // 启动应用
+    await Core.init();
+  } catch (error) {
+    console.error('初始化失败:', error);
+  }
+};
 
 // 应用状态管理
 const App = {
   config: {
     async getPassword() {
       try {
-        // 使用RPC调用替代直接表访问
-        const { data, error } = await supabase
-          .rpc('get_password');
-        
-        if (error) throw error;
-        return data || 'admin123'; // 默认密码
+        const { data, error } = await window.supabase
+          .from('passwords')
+          .select('password')
+          .single();
+
+        if (error || !data) {
+          // 初始化默认密码
+          await window.supabase.from('passwords').insert([{ password: 'admin123' }]);
+          return 'admin123';
+        }
+        return data.password;
       } catch (error) {
         console.error('密码获取失败:', error);
         return 'admin123';
@@ -116,12 +145,18 @@ const App = {
 
     async setPassword(newPassword) {
       try {
-        // 使用RPC调用更新密码
-        const { error } = await supabase
-          .rpc('set_password', { new_password: newPassword });
-        
-        if (error) throw error;
-        return true;
+        // 清空旧密码
+        const { error: deleteError } = await window.supabase
+          .from('passwords')
+          .delete()
+          .neq('id', '');
+        if (deleteError) throw deleteError;
+
+        // 插入新密码
+        const { error: insertError } = await window.supabase
+          .from('passwords')
+          .insert([{ password: newPassword }]);
+        return !insertError;
       } catch (error) {
         console.error('密码设置失败:', error);
         return false;
@@ -130,61 +165,14 @@ const App = {
 
     async getThemes() {
       try {
-        // 确保有SELECT权限
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
           .from('themes')
           .select('*')
           .order('created_at', { ascending: true });
-        
-        if (error) throw error;
-        return data || [];
+        return error ? [] : data;
       } catch (error) {
         console.error('主题获取失败:', error);
         return [];
-      }
-    },
-
-    async saveTheme(theme) {
-      try {
-        const { error } = await supabase
-          .from('themes')
-          .insert([theme]);
-        
-        if (error) throw error;
-        return true;
-      } catch (error) {
-        console.error('保存主题失败:', error);
-        throw error;
-      }
-    },
-
-    async updateTheme(id, updates) {
-      try {
-        const { error } = await supabase
-          .from('themes')
-          .update(updates)
-          .eq('id', id);
-        
-        if (error) throw error;
-        return true;
-      } catch (error) {
-        console.error('更新主题失败:', error);
-        throw error;
-      }
-    },
-
-    async deleteTheme(id) {
-      try {
-        const { error } = await supabase
-          .from('themes')
-          .delete()
-          .eq('id', id);
-        
-        if (error) throw error;
-        return true;
-      } catch (error) {
-        console.error('删除主题失败:', error);
-        throw error;
       }
     }
   },
@@ -215,12 +203,12 @@ const Core = {
 
   async loadSampleThemes() {
     try {
-      await App.config.saveTheme({
+      await window.supabase.from('themes').insert([{
         name: '風格',
         options: ['卡通風格', '寫實風格'],
         allow_custom: true,
         is_text_input: false
-      });
+      }]);
       UI.initFrontend();
     } catch (error) {
       console.error('示例主题初始化失败:', error);
@@ -339,13 +327,12 @@ const Admin = {
       }
     } catch (error) {
       console.error('登录失败:', error);
-      alert('登入失敗: ' + error.message);
     }
   },
 
   async refreshThemeList() {
     try {
-      const themes = await App.config.getThemes();
+      const { data: themes } = await window.supabase.from('themes').select('*');
       const container = document.getElementById('existingThemes');
       container.innerHTML = themes.map(theme => `
         <div class="theme-block" data-id="${theme.id}">
@@ -376,7 +363,6 @@ const Admin = {
       `).join('');
     } catch (error) {
       console.error('刷新主题列表失败:', error);
-      alert('刷新主题列表失败: ' + error.message);
     }
   },
 
@@ -400,21 +386,16 @@ const Admin = {
         throw new Error('請輸入至少一個選項！');
       }
 
-      await App.config.saveTheme(newTheme);
+      const { error } = await window.supabase.from('themes').insert([newTheme]);
+      if (error) throw error;
+
       this.clearNewThemeForm();
       await this.refreshThemeList();
       alert('主題保存成功！');
     } catch (error) {
       console.error('保存主题失败:', error);
-      alert('保存主题失败: ' + error.message);
+      alert(error.message);
     }
-  },
-
-  clearNewThemeForm() {
-    document.getElementById('newThemeName').value = '';
-    document.getElementById('newThemeOptions').value = '';
-    document.getElementById('allowCustom').checked = false;
-    document.getElementById('isTextInput').checked = false;
   },
 
   async changePassword() {
@@ -423,14 +404,11 @@ const Admin = {
       const newPassword = document.getElementById('newPassword').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
 
-      if (!oldPassword || !newPassword || !confirmPassword) {
-        throw new Error('請填寫所有密碼欄位！');
-      }
+      if (newPassword !== confirmPassword) throw new Error('新密碼與確認密碼不一致！');
       
-      if (newPassword !== confirmPassword) {
-        throw new Error('新密碼與確認密碼不一致！');
-      }
-      
+      const currentPassword = await App.config.getPassword();
+      if (oldPassword !== currentPassword) throw new Error('舊密碼不正確！');
+
       const success = await App.config.setPassword(newPassword);
       if (success) {
         alert('密碼修改成功！');
@@ -440,67 +418,13 @@ const Admin = {
       }
     } catch (error) {
       console.error('修改密码失败:', error);
-      alert('修改密码失败: ' + error.message);
-    }
-  },
-
-  async updateTheme(id) {
-    try {
-      const updates = {
-        name: document.getElementById(`name_${id}`).value.trim(),
-        allow_custom: document.getElementById(`allowCustom_${id}`).checked,
-        is_text_input: document.getElementById(`isTextInput_${id}`).checked
-      };
-
-      if (!updates.name) throw new Error('主題名稱不能為空！');
-      
-      if (!updates.is_text_input) {
-        const optionsText = document.getElementById(`options_${id}`).value;
-        updates.options = optionsText.split('\n').map(o => o.trim()).filter(o => o);
-        
-        if (updates.options.length === 0) {
-          throw new Error('請輸入至少一個選項！');
-        }
-      } else {
-        updates.options = [];
-      }
-
-      await App.config.updateTheme(id, updates);
-      alert('主題更新成功！');
-      await this.refreshThemeList();
-    } catch (error) {
-      console.error('更新主题失败:', error);
-      alert('更新主题失败: ' + error.message);
-    }
-  },
-
-  async deleteTheme(id) {
-    try {
-      if (!confirm('確定要刪除此主題嗎？')) return;
-      
-      await App.config.deleteTheme(id);
-      alert('主題刪除成功！');
-      await this.refreshThemeList();
-    } catch (error) {
-      console.error('删除主题失败:', error);
-      alert('删除主题失败: ' + error.message);
+      alert(error.message);
     }
   }
 };
 
 // 初始化应用
-document.addEventListener('DOMContentLoaded', () => {
-  // 按钮事件绑定
-  document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
-  document.getElementById('loginBtn').addEventListener('click', () => Admin.login());
-  document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('backToFrontBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('saveThemeBtn').addEventListener('click', () => Admin.saveTheme());
-  document.getElementById('changePasswordBtn').addEventListener('click', () => Admin.changePassword());
-
-  // 初始化应用
-  Core.init();
-});
+document.addEventListener('DOMContentLoaded', initializeApp);
 </script>
 </body>
 </html>
