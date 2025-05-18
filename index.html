@@ -92,33 +92,33 @@
 
 <script>
 // 初始化Supabase客户端
-const initializeApp = async () => {  
-// 配置参数（需替换）
 const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';
 
-  // 确保supabase库已加载
-  if (typeof supabase === 'undefined') {
-    console.error('Supabase库未正确加载');
-    return;
+let supabaseClient = null;
+
+const initializeApp = async () => {
+  try {
+    // 创建客户端实例
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window.supabase = supabaseClient;
+
+    // 初始化事件监听
+    document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
+    document.getElementById('loginBtn').addEventListener('click', Admin.login);
+    document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
+    document.getElementById('backToFrontBtn').addEventListener('click', Core.backToFrontend);
+    document.getElementById('prevBtn').addEventListener('click', UI.prevStep);
+    document.getElementById('nextBtn').addEventListener('click', UI.nextStep);
+    document.getElementById('generateBtn').addEventListener('click', UI.generateNow);
+    document.getElementById('saveThemeBtn').addEventListener('click', Admin.saveTheme);
+    document.getElementById('changePasswordBtn').addEventListener('click', Admin.changePassword);
+
+    // 启动应用
+    await Core.init();
+  } catch (error) {
+    console.error('初始化失败:', error);
   }
-
-  // 创建客户端实例
-  window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  // 初始化事件监听
-  document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
-  document.getElementById('loginBtn').addEventListener('click', Admin.login);
-  document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('backToFrontBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('prevBtn').addEventListener('click', UI.prevStep);
-  document.getElementById('nextBtn').addEventListener('click', UI.nextStep);
-  document.getElementById('generateBtn').addEventListener('click', UI.generateNow);
-  document.getElementById('saveThemeBtn').addEventListener('click', Admin.saveTheme);
-  document.getElementById('changePasswordBtn').addEventListener('click', Admin.changePassword);
-
-  // 启动应用
-  await Core.init();
 };
 
 // 应用状态管理
@@ -126,14 +126,14 @@ const App = {
   config: {
     async getPassword() {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
           .from('passwords')
           .select('password')
           .single();
 
         if (error || !data) {
           // 初始化默认密码
-          await supabase.from('passwords').insert([{ password: 'admin123' }]);
+          await window.supabase.from('passwords').insert([{ password: 'admin123' }]);
           return 'admin123';
         }
         return data.password;
@@ -146,14 +146,14 @@ const App = {
     async setPassword(newPassword) {
       try {
         // 清空旧密码
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await window.supabase
           .from('passwords')
           .delete()
           .neq('id', '');
         if (deleteError) throw deleteError;
 
         // 插入新密码
-        const { error: insertError } = await supabase
+        const { error: insertError } = await window.supabase
           .from('passwords')
           .insert([{ password: newPassword }]);
         return !insertError;
@@ -165,7 +165,7 @@ const App = {
 
     async getThemes() {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
           .from('themes')
           .select('*')
           .order('created_at', { ascending: true });
@@ -203,7 +203,7 @@ const Core = {
 
   async loadSampleThemes() {
     try {
-      await supabase.from('themes').insert([{
+      await window.supabase.from('themes').insert([{
         name: '風格',
         options: ['卡通風格', '寫實風格'],
         allow_custom: true,
@@ -332,7 +332,7 @@ const Admin = {
 
   async refreshThemeList() {
     try {
-      const { data: themes } = await supabase.from('themes').select('*');
+      const { data: themes } = await window.supabase.from('themes').select('*');
       const container = document.getElementById('existingThemes');
       container.innerHTML = themes.map(theme => `
         <div class="theme-block" data-id="${theme.id}">
@@ -386,7 +386,7 @@ const Admin = {
         throw new Error('請輸入至少一個選項！');
       }
 
-      const { error } = await supabase.from('themes').insert([newTheme]);
+      const { error } = await window.supabase.from('themes').insert([newTheme]);
       if (error) throw error;
 
       this.clearNewThemeForm();
@@ -423,19 +423,8 @@ const Admin = {
   }
 };
 
-// 事件绑定
-document.addEventListener('DOMContentLoaded', () => {
-  // 按钮事件绑定
-  document.getElementById('adminEntry').addEventListener('click', Core.showLoginPanel);
-  document.getElementById('loginBtn').addEventListener('click', Admin.login.bind(Admin));
-  document.getElementById('cancelBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('backToFrontBtn').addEventListener('click', Core.backToFrontend);
-  document.getElementById('saveThemeBtn').addEventListener('click', Admin.saveTheme.bind(Admin));
-  document.getElementById('changePasswordBtn').addEventListener('click', Admin.changePassword.bind(Admin));
-
-  // 初始化应用
-  Core.init();
-});
+// 初始化应用
+document.addEventListener('DOMContentLoaded', initializeApp);
 </script>
 </body>
 </html>
