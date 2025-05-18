@@ -2,7 +2,7 @@
 <html>
 <head>
   <title>AI圖片生成提示詞生成器</title>
-  <link rel="icon" href="data:,"> <!-- 完全消除favicon请求 -->
+  <link rel="icon" href="data:,">
   <style>
     /* 保持原有样式不变 */
     :root {
@@ -104,12 +104,12 @@
       font-size: 1.5em;
     }
   </style>
-  <!-- 优先加载Supabase客户端库 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <!-- 页面结构保持不变 -->
   <div class="header">
-    <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" 
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAB5SURBVDiN7ZMxDsAgCEOf6f9ftV66dKghMWZQW+1Q4AMJAFDVPKpVzQCwA8h3sW4hBmZ+9Y6I3gN6VlV3gJkfPc6qCgBwzj3G+QK01hIROOc+7y8g5xwRkYh8x/8Dq1XNAJBz/ge01g4BZj4BvPcX4Jz7Aqy1BwBmfgHWWgJwv0F/AAAAAElFTkSuQmCC" 
          class="logo" alt="Logo">
     <button id="adminEntry">進入後台管理</button>
   </div>
@@ -173,8 +173,8 @@
 
 <script>
 // 初始化Supabase客户端
-const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNDk0MjksImV4cCI6MjA2MjcyNTQyOX0.bwwchqNNGxWhjddrooTfUFpfptWHrcwiXKMUgjfPh_w';
+const SUPABASE_URL = 'https://xxxxxxxxx.supabase.co'; // 替换为你的URL
+const SUPABASE_KEY = 'your-anon-key';                // 替换为你的密钥
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 应用状态管理
@@ -200,17 +200,17 @@ const App = {
           .from('passwords')
           .delete()
           .neq('id', '');
-
-        if (deleteError) throw deleteError;
+        
+        if(deleteError) throw deleteError;
 
         // 插入新密码
         const { error: insertError } = await supabase
           .from('passwords')
           .insert([{ password: newPassword }]);
-
+        
         return !insertError;
       } catch (error) {
-        console.error('密码设置失败:', error);
+        console.error('设置密码失败:', error);
         return false;
       }
     },
@@ -220,7 +220,7 @@ const App = {
         const { data, error } = await supabase
           .from('themes')
           .select('*')
-          .order('created_at');
+          .order('created_at', { ascending: true });
         return error ? [] : data;
       } catch (error) {
         console.error('获取主题失败:', error);
@@ -235,41 +235,175 @@ const App = {
   }
 };
 
-// 后台管理模块修正版
-const Admin = {
-  async changePassword() {
+// 核心功能模块
+const Core = {
+  async init() {
     try {
-      const oldPassword = document.getElementById('oldPassword').value;
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-
-      // 验证旧密码
-      const currentPassword = await App.config.getPassword();
-      if (oldPassword !== currentPassword) {
-        alert('舊密碼不正確！');
-        return;
-      }
-
-      // 验证新密码
-      if (newPassword !== confirmPassword) {
-        alert('新密碼與確認密碼不一致！');
-        return;
-      }
-
-      // 更新密码
-      const success = await App.config.setPassword(newPassword);
-      if (success) {
-        alert('密碼修改成功！');
-        // 清空输入框
-        ['oldPassword', 'newPassword', 'confirmPassword'].forEach(id => {
-          document.getElementById(id).value = '';
-        });
+      this.resetAppState();
+      if(location.hash === '#admin') {
+        this.showLoginPanel();
       } else {
-        alert('密碼修改失敗！');
+        document.getElementById('frontend').classList.remove('hidden');
+        await UI.initFrontend();
+        const themes = await App.config.getThemes();
+        if(themes.length === 0) await this.loadSampleThemes();
       }
     } catch (error) {
-      console.error('修改密码出错:', error);
-      alert('修改密码时发生错误');
+      console.error('初始化失败:', error);
+    }
+  },
+
+  async loadSampleThemes() {
+    try {
+      const { error } = await supabase.from('themes').insert([{
+        name: '風格',
+        options: ['卡通風格', '寫實風格'],
+        allow_custom: true,
+        is_text_input: false
+      }]);
+      if(!error) await UI.initFrontend();
+    } catch (error) {
+      console.error('初始化示例主题失败:', error);
+    }
+  },
+
+  showLoginPanel: () => {
+    document.getElementById('frontend').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+  },
+
+  backToFrontend: async () => {
+    location.hash = '';
+    document.getElementById('adminPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('frontend').classList.remove('hidden');
+    Core.resetAppState();
+    await UI.initFrontend();
+  },
+
+  resetAppState: () => {
+    App.state = {
+      currentStep: 0,
+      selections: {},
+      promptLines: []
+    };
+    UI.clearResult();
+  }
+};
+
+// 前台界面模块
+const UI = {
+  async initFrontend() {
+    try {
+      const themes = await App.config.getThemes();
+      this.renderThemeNav(themes);
+      this.renderCurrentStep(themes);
+    } catch (error) {
+      console.error('前台初始化失败:', error);
+    }
+  },
+
+  async renderThemeNav(themes) {
+    const navContainer = document.getElementById('themeNav');
+    navContainer.innerHTML = themes.map((theme, index) => `
+      <div class="theme-nav-item ${index === App.state.currentStep ? 'active' : ''}">
+        ${theme.name}
+      </div>
+    `).join('');
+
+    // 动态绑定事件
+    themes.forEach((_, index) => {
+      navContainer.children[index].onclick = () => this.jumpToStep(index);
+    });
+  },
+
+  async renderCurrentStep(themes) {
+    const container = document.getElementById('steps');
+    container.innerHTML = '';
+
+    if(themes.length === 0) {
+      container.innerHTML = '<div class="step">暫無可用主題</div>';
+      return;
+    }
+
+    const theme = themes[App.state.currentStep];
+    const stepDiv = document.createElement('div');
+    stepDiv.className = 'step';
+    stepDiv.innerHTML = `<h3>${theme.name}</h3><div class="options"></div>`;
+
+    const optionsContainer = stepDiv.querySelector('.options');
+    
+    if(theme.is_text_input) {
+      const textValue = App.state.selections[theme.id]?.[0] || '';
+      optionsContainer.innerHTML = `
+        <div class="text-input-mode">
+          <input type="text" 
+                 data-theme="${theme.id}" 
+                 value="${textValue}"
+                 oninput="UI.handleTextInput(this)">
+        </div>
+      `;
+    } else {
+      // 渲染选项...
+    }
+
+    container.appendChild(stepDiv);
+  },
+
+  handleTextInput(inputElement) {
+    const themeId = inputElement.dataset.theme;
+    App.state.selections[themeId] = [inputElement.value.trim()];
+  },
+
+  async nextStep() {
+    await this.saveSelections();
+    const themes = await App.config.getThemes();
+    if(App.state.currentStep < themes.length - 1) {
+      App.state.currentStep++;
+      this.renderCurrentStep(themes);
+      this.renderThemeNav(themes);
+    } else {
+      this.showResult();
+    }
+  },
+
+  async showResult() {
+    const themes = await App.config.getThemes();
+    App.state.promptLines = themes
+      .filter(theme => {
+        const selections = App.state.selections[theme.id];
+        return selections?.length > 0 && selections[0] !== '';
+      })
+      .map(theme => `${theme.name}: ${App.state.selections[theme.id].join(', ')}`);
+
+    document.getElementById('result').innerHTML = `
+      <h3>生成的Prompt:</h3>
+      <pre>${App.state.promptLines.join('\n') || '未選擇任何選項'}</pre>
+      <div class="button-group">
+        <button onclick="UI.copyPrompt()">複製Prompt</button>
+        <button onclick="Core.backToFrontend()">重新開始</button>
+      </div>`;
+  },
+
+  // ... 其他方法 ...
+};
+
+// 后台管理模块
+const Admin = {
+  async login() {
+    try {
+      const inputPassword = document.getElementById('password').value;
+      const realPassword = await App.config.getPassword();
+      
+      if(inputPassword === realPassword) {
+        document.getElementById('loginPanel').classList.add('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
+        await this.refreshThemeList();
+      } else {
+        alert('密碼錯誤！');
+      }
+    } catch (error) {
+      console.error('登录失败:', error);
     }
   },
 
@@ -285,91 +419,69 @@ const Admin = {
         is_text_input: document.getElementById('isTextInput').checked
       };
 
-      // 验证输入
-      if (!newTheme.name) {
-        alert('請輸入主題名稱！');
-        return;
-      }
-      
-      if (newTheme.is_text_input) {
-        newTheme.options = [];
-      } else if (newTheme.options.length === 0) {
-        alert('請輸入至少一個選項！');
-        return;
-      }
+      if (!newTheme.name) throw new Error('請輸入主題名稱');
+      if (newTheme.is_text_input) newTheme.options = [];
+      if (!newTheme.is_text_input && newTheme.options.length === 0) throw new Error('請輸入至少一個選項');
 
-      // 插入数据库
-      const { error } = await supabase
-        .from('themes')
-        .insert([newTheme]);
+      const { error } = await supabase.from('themes').insert([newTheme]);
+      if(error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      // 清空表单并刷新列表
       this.clearNewThemeForm();
       await this.refreshThemeList();
       alert('主題保存成功！');
     } catch (error) {
-      console.error('保存主题失败:', error);
       alert(`保存失败: ${error.message}`);
     }
   },
 
-  async refreshThemeList() {
+  async changePassword() {
     try {
-      const { data: themes, error } = await supabase
-        .from('themes')
-        .select('*')
-        .order('created_at', { ascending: true });
+      const oldPassword = document.getElementById('oldPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
 
-      if (error) throw error;
+      if(newPassword !== confirmPassword) throw new Error('新密碼與確認密碼不一致');
+      
+      const currentPassword = await App.config.getPassword();
+      if(oldPassword !== currentPassword) throw new Error('舊密碼不正確');
 
-      const container = document.getElementById('existingThemes');
-      container.innerHTML = themes.map(theme => `
-        <div class="theme-block" data-id="${theme.id}">
-          <div class="theme-management">
-            <input type="text" value="${theme.name}" id="name_${theme.id}">
-            ${theme.is_text_input ? '' : `
-              <textarea id="options_${theme.id}" rows="3">${theme.options?.join('\n') || ''}</textarea>
-            `}
-            <div class="option-settings">
-              <label>
-                <input type="checkbox" id="allowCustom_${theme.id}" 
-                      ${theme.allow_custom ? 'checked' : ''} 
-                      ${theme.is_text_input ? 'disabled' : ''}>
-                允許自定義
-              </label>
-              <label>
-                <input type="checkbox" id="isTextInput_${theme.id}" 
-                      ${theme.is_text_input ? 'checked' : ''}>
-                純文字模式
-              </label>
-            </div>
-            <div class="admin-btn-group">
-              <button onclick="Admin.updateTheme('${theme.id}')">更新</button>
-              <button onclick="Admin.deleteTheme('${theme.id}')">刪除</button>
-            </div>
-          </div>
-        </div>
-      `).join('');
+      const success = await App.config.setPassword(newPassword);
+      if(success) {
+        alert('密碼修改成功！');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+      }
     } catch (error) {
-      console.error('刷新主题列表失败:', error);
+      alert(`密碼修改失败: ${error.message}`);
     }
   },
 
-  // 其他方法保持不变...
+  // ... 其他方法 ...
 };
 
-// 事件监听修正版
+// 事件绑定
 document.addEventListener('DOMContentLoaded', () => {
-  // 按钮事件绑定
-  document.getElementById('changePasswordBtn').addEventListener('click', () => Admin.changePassword());
-  document.getElementById('saveThemeBtn').addEventListener('click', () => Admin.saveTheme());
-  
-  // 其他事件绑定...
-  // 初始化应用...
+  // 绑定所有按钮事件
+  const bindings = {
+    '#adminEntry': Core.showLoginPanel,
+    '#loginBtn': Admin.login,
+    '#cancelBtn': Core.backToFrontend,
+    '#backToFrontBtn': Core.backToFrontend,
+    '#prevBtn': UI.prevStep,
+    '#nextBtn': UI.nextStep,
+    '#generateBtn': UI.generateNow,
+    '#saveThemeBtn': Admin.saveTheme,
+    '#changePasswordBtn': Admin.changePassword
+  };
+
+  Object.entries(bindings).forEach(([selector, handler]) => {
+    const el = document.querySelector(selector);
+    if(el) el.addEventListener('click', handler);
+  });
+
+  // 初始化应用
+  Core.init();
 });
 </script>
 </body>
