@@ -23,6 +23,7 @@
     #adminEntry { position: fixed; top: 20px; right: 20px; }
     .button-group { margin-top: 20px; display: flex; gap: 10px; }
     .title { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); }
+    #result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -86,27 +87,80 @@
 <script>
 // Supabase配置
 const SUPABASE_URL = 'https://wenvirapddldhhfnhtxv.supabase.co';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzE0OTQyOSwiZXhwIjoyMDYyNzI1NDI5fQ.5hfLHnnwo-_2oS2V8-y7drqjYrojiDmL-AXhrO_HHvg';
-let supabase = supabase.createClient(SUPABASE_URL, SERVICE_KEY);
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlbnZpcmFwZGRsZGhoZm5odHh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzE0OTQyOSwiZXhwIjoyMDYyNzI1NDI5fQ.J1jXa7kvN1n6JHbJ7QdZ2qHVZJEURrjcDBkI8Qe9Xk8';
+
+// 初始化Supabase客户端
+const supabase = supabase.createClient(SUPABASE_URL, SERVICE_KEY);
 
 // 應用狀態
-let appState = {
+const AppState = {
   currentStep: 0,
   selections: {},
-  themes: []
+  themes: [],
+  password: 'admin123'
 };
 
 // 核心功能
 const Core = {
   async init() {
-    document.getElementById('frontend').classList.remove('hidden');
     await this.loadThemes();
+    await this.checkPassword();
     UI.initFrontend();
+    this.setupEventListeners();
   },
 
   async loadThemes() {
     const { data } = await supabase.from('themes').select('*').order('order');
-    appState.themes = data || [];
+    AppState.themes = data || [];
+  },
+
+  async checkPassword() {
+    const { data } = await supabase.from('passwords').select('password').single();
+    if (data) AppState.password = data.password;
+  },
+
+  setupEventListeners() {
+    document.getElementById('adminEntry').addEventListener('click', () => 
+      UI.togglePanel('loginPanel'));
+    
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const inputPass = document.getElementById('password').value;
+      if (inputPass === AppState.password) {
+        UI.togglePanel('adminPanel');
+        await Admin.loadExistingThemes();
+      } else {
+        alert('密碼錯誤！');
+      }
+    });
+
+    document.getElementById('saveThemeBtn').addEventListener('click', async () => {
+      const newTheme = {
+        name: document.getElementById('newThemeName').value,
+        options: document.getElementById('newThemeOptions').value.split('\n'),
+        allow_custom: document.getElementById('allowCustom').checked,
+        is_text_input: document.getElementById('isTextInput').checked,
+        order: AppState.themes.length + 1
+      };
+      
+      if (await Admin.saveTheme(newTheme)) {
+        await Core.loadThemes();
+        UI.initFrontend();
+      }
+    });
+
+    document.getElementById('changePasswordBtn').addEventListener('click', async () => {
+      const oldPass = document.getElementById('oldPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confirmPass = document.getElementById('confirmPassword').value;
+      
+      if (newPass !== confirmPass) return alert('密碼不一致！');
+      if (oldPass !== AppState.password) return alert('舊密碼錯誤！');
+      
+      if (await Admin.updatePassword(newPass)) {
+        AppState.password = newPass;
+        alert('密碼修改成功！');
+      }
+    });
   }
 };
 
@@ -119,16 +173,23 @@ const UI = {
 
   renderThemeNav() {
     const nav = document.getElementById('themeNav');
-    nav.innerHTML = appState.themes.map((theme, index) => `
-      <div class="theme-nav-item ${index === appState.currentStep ? 'active' : ''}">
+    nav.innerHTML = AppState.themes.map((theme, index) => `
+      <div class="theme-nav-item ${index === AppState.currentStep ? 'active' : ''}" 
+           onclick="UI.jumpToStep(${index})">
         ${theme.name}
       </div>
     `).join('');
   },
 
+  jumpToStep(step) {
+    AppState.currentStep = step;
+    this.renderCurrentStep();
+    this.renderThemeNav();
+  },
+
   renderCurrentStep() {
     const container = document.getElementById('steps');
-    const theme = appState.themes[appState.currentStep];
+    const theme = AppState.themes[AppState.currentStep];
     
     container.innerHTML = theme ? `
       <div class="step">
@@ -146,80 +207,47 @@ const UI = {
     ` : '<div class="step">暫無可用主題</div>';
   },
 
-  selectOption(option) {
-    appState.selections[appState.currentStep] = option;
-    this.nextStep();
-  },
-
-  nextStep() {
-    if(appState.currentStep < appState.themes.length - 1) {
-      appState.currentStep++;
-      this.renderThemeNav();
-      this.renderCurrentStep();
-    }
+  togglePanel(panelId) {
+    ['frontend', 'loginPanel', 'adminPanel'].forEach(id => 
+      document.getElementById(id).classList.toggle('hidden', id !== panelId));
   }
 };
 
 // 後台管理
 const Admin = {
-  async login(password) {
-    const { data } = await supabase.from('passwords').select('password').single();
-    return data?.password === password;
+  async loadExistingThemes() {
+    const { data } = await supabase.from('themes').select('*');
+    const container = document.getElementById('existingThemes');
+    container.innerHTML = data.map(theme => `
+      <div class="theme-block">
+        <h4>${theme.name}</h4>
+        <p>模式：${theme.is_text_input ? '文字輸入' : '選項選擇'}</p>
+        <button onclick="Admin.deleteTheme(${theme.id})">刪除</button>
+      </div>
+    `).join('');
   },
 
-  async saveTheme(themeData) {
-    const { error } = await supabase.from('themes').insert({
-      ...themeData,
-      order: appState.themes.length + 1
-    });
-    return !error;
+  async saveTheme(theme) {
+    const { error } = await supabase.from('themes').insert(theme);
+    if (error) return alert('保存失敗！');
+    alert('保存成功！');
+    return true;
   },
 
-  async changePassword(newPassword) {
-    const { error } = await supabase.from('passwords').upsert({ 
-      id: 1, 
-      password: newPassword 
-    });
+  async deleteTheme(id) {
+    const { error } = await supabase.from('themes').delete().eq('id', id);
+    if (!error) this.loadExistingThemes();
+  },
+
+  async updatePassword(newPass) {
+    const { error } = await supabase.from('passwords')
+      .upsert({ id: 1, password: newPass });
     return !error;
   }
 };
 
-// 事件處理
-document.addEventListener('DOMContentLoaded', async () => {
-  // 初始化事件
-  document.getElementById('adminEntry').addEventListener('click', () => {
-    document.getElementById('frontend').classList.add('hidden');
-    document.getElementById('loginPanel').classList.remove('hidden');
-  });
-
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const password = document.getElementById('password').value;
-    if(await Admin.login(password)) {
-      document.getElementById('loginPanel').classList.add('hidden');
-      document.getElementById('adminPanel').classList.remove('hidden');
-    } else {
-      alert('密碼錯誤！');
-    }
-  });
-
-  document.getElementById('saveThemeBtn').addEventListener('click', async () => {
-    const newTheme = {
-      name: document.getElementById('newThemeName').value,
-      options: document.getElementById('newThemeOptions').value.split('\n'),
-      allow_custom: document.getElementById('allowCustom').checked,
-      is_text_input: document.getElementById('isTextInput').checked
-    };
-    
-    if(await Admin.saveTheme(newTheme)) {
-      alert('主題保存成功！');
-      await Core.loadThemes();
-      UI.initFrontend();
-    }
-  });
-
-  // 初始化應用
-  await Core.init();
-});
+// 啟動應用
+document.addEventListener('DOMContentLoaded', () => Core.init());
 </script>
 </body>
 </html>
