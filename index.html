@@ -26,10 +26,8 @@
     .title { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); }
     #result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap; }
     .result-actions { margin-top: 10px; }
-    .sortable-ghost { opacity: 0.5; background: #f8f9fa; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="header">
@@ -84,8 +82,7 @@
     </div>
 
     <div id="existingThemes">
-      <h3>現有主題管理（拖動排序）</h3>
-      <div id="themeList"></div>
+      <h3>現有主題管理</h3>
     </div>
   </div>
 
@@ -174,7 +171,12 @@
       const container = document.getElementById('steps');
       const theme = App.themes[App.currentStep];
       
-      container.innerHTML = theme ? `
+      if (!theme) {
+        container.innerHTML = '<div class="step">暫無可用主題</div>';
+        return;
+      }
+
+      container.innerHTML = `
         <div class="step">
           <h3>${theme.name}</h3>
           <div class="options">
@@ -188,7 +190,7 @@
             `).join('')}
           </div>
         </div>
-      ` : '<div class="step">暫無可用主題</div>';
+      `;
     },
     
     selectOption: function(option) {
@@ -201,7 +203,6 @@
   const Core = {
     async init() {
       await this.loadData();
-      this.initSortable();
       this.bindEvents();
       UI.renderThemeNav();
       UI.renderCurrentStep();
@@ -232,21 +233,50 @@
     },
 
     bindEvents() {
-      document.getElementById('adminEntry').addEventListener('click', () => 
-        UI.togglePanel('loginPanel'));
+      // 前台事件
+      document.getElementById('prevBtn').addEventListener('click', () => UI.prevStep());
+      document.getElementById('nextBtn').addEventListener('click', () => UI.nextStep());
+      document.getElementById('generateBtn').addEventListener('click', () => UI.generateResult());
+      document.getElementById('adminEntry').addEventListener('click', () => UI.togglePanel('loginPanel'));
       
-      document.getElementById('backToFrontBtn').addEventListener('click', () => 
-        UI.togglePanel('frontend'));
+      // 后台事件
+      document.getElementById('backToFrontBtn').addEventListener('click', () => UI.togglePanel('frontend'));
+      document.getElementById('loginBtn').addEventListener('click', this.handleLogin);
+    },
+
+    handleLogin: async () => {
+      const inputPass = document.getElementById('password').value;
+      if (inputPass === App.password) {
+        UI.togglePanel('adminPanel');
+        await Admin.loadThemes();
+      } else {
+        alert('密碼錯誤！');
+      }
+    }
+  };
+
+  // 后台管理模块
+  window.Admin = {
+    async loadThemes() {
+      const { data } = await window.supabase
+        .from('themes')
+        .select('*');
       
-      document.getElementById('loginBtn').addEventListener('click', async () => {
-        const inputPass = document.getElementById('password').value;
-        if (inputPass === App.password) {
-          UI.togglePanel('adminPanel');
-          Admin.loadThemes();
-        } else {
-          alert('密碼錯誤！');
-        }
-      });
+      const container = document.getElementById('existingThemes');
+      container.innerHTML = data.map(t => `
+        <div class="theme-block">
+          <h4>${t.name}</h4>
+          <p>模式：${t.is_text_input ? '文字輸入' : '選項選擇'}</p>
+          <p>選項：${t.options?.join(', ') || '無'}</p>
+          <button onclick="Admin.deleteTheme(${t.id})">刪除</button>
+        </div>
+      `).join('');
+    },
+
+    async deleteTheme(id) {
+      if (!confirm('確定要刪除這個主題嗎？')) return;
+      await window.supabase.from('themes').delete().eq('id', id);
+      await this.loadThemes();
     }
   };
 
