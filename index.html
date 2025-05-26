@@ -200,8 +200,7 @@
     },
     
     selectOption: function(option) {
-      App.selections[App.currentStep] = 
-        App.selections[App.currentStep] === option ? null : option;
+      App.selections[App.currentStep] = option;
       this.renderCurrentStep();
     }
   };
@@ -225,44 +224,32 @@
     },
 
     async loadThemes() {
-      try {
-        const { data } = await window.supabase
-          .from('themes')
-          .select('*')
-          .order('sort_order', { ascending: true });
-        App.themes = data || [];
-      } catch (error) {
-        console.error('載入主題失敗:', error);
-      }
+      const { data } = await window.supabase
+        .from('themes')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      App.themes = data || [];
     },
 
     async loadPassword() {
-      try {
-        const { data } = await window.supabase
-          .from('passwords')
-          .select('password')
-          .single();
-        if (data) App.password = data.password;
-      } catch (error) {
-        console.error('載入密碼失敗:', error);
-      }
+      const { data } = await window.supabase
+        .from('passwords')
+        .select('password')
+        .single();
+      if (data) App.password = data.password;
     },
 
     async updateThemeOrder(ids) {
-      try {
-        const updates = ids.map((id, index) => ({
-          id: parseInt(id),
-          sort_order: index + 1
-        }));
-        
-        await window.supabase
-          .from('themes')
-          .upsert(updates, { onConflict: 'id' });
-        await this.loadThemes();
-        UI.renderThemeNav();
-      } catch (error) {
-        console.error('更新排序失敗:', error);
-      }
+      const updates = ids.map((id, index) => ({
+        id: parseInt(id),
+        sort_order: index + 1
+      }));
+      
+      await window.supabase
+        .from('themes')
+        .upsert(updates);
+      await this.loadThemes();
+      UI.renderThemeNav();
     },
 
     initSortable() {
@@ -277,17 +264,20 @@
     },
 
     bindEvents() {
+      // 前台事件
       document.getElementById('prevBtn').addEventListener('click', () => UI.prevStep());
       document.getElementById('nextBtn').addEventListener('click', () => UI.nextStep());
       document.getElementById('generateBtn').addEventListener('click', () => UI.generateResult());
       document.getElementById('adminEntry').addEventListener('click', () => UI.togglePanel('loginPanel'));
+      
+      // 后台事件
       document.getElementById('backToFrontBtn').addEventListener('click', () => UI.togglePanel('frontend'));
-      document.getElementById('loginBtn').addEventListener('click', () => this.handleLogin());
-      document.getElementById('saveThemeBtn').addEventListener('click', () => this.handleSaveTheme());
-      document.getElementById('changePasswordBtn').addEventListener('click', () => this.handleChangePassword());
+      document.getElementById('loginBtn').addEventListener('click', this.handleLogin);
+      document.getElementById('saveThemeBtn').addEventListener('click', this.handleSaveTheme);
+      document.getElementById('changePasswordBtn').addEventListener('click', this.handleChangePassword);
     },
 
-    async handleLogin() {
+    handleLogin: async () => {
       const inputPass = document.getElementById('password').value;
       if (inputPass === App.password) {
         UI.togglePanel('adminPanel');
@@ -297,14 +287,15 @@
       }
     },
 
-    async handleSaveTheme() {
+    handleSaveTheme: async () => {
       const newTheme = {
         name: document.getElementById('newThemeName').value.trim(),
         options: document.getElementById('newThemeOptions').value
           .split('\n')
           .filter(o => o.trim()),
         allow_custom: document.getElementById('allowCustom').checked,
-        is_text_input: document.getElementById('isTextInput').checked
+        is_text_input: document.getElementById('isTextInput').checked,
+        sort_order: App.themes.length + 1
       };
 
       if (!newTheme.name) return alert('請輸入主題名稱！');
@@ -315,16 +306,16 @@
         if (App.editingTheme) {
           await window.supabase
             .from('themes')
-            .update({ ...newTheme, sort_order: App.themes.length + 1 })
+            .update(newTheme)
             .eq('id', App.editingTheme);
         } else {
           await window.supabase
             .from('themes')
-            .insert({ ...newTheme, sort_order: App.themes.length + 1 });
+            .insert(newTheme);
         }
         
         await this.loadThemes();
-        await Admin.loadThemes();
+        Admin.loadThemes();
         this.clearThemeForm();
         alert('主題保存成功！');
       } catch (error) {
@@ -332,7 +323,7 @@
       }
     },
 
-    async handleChangePassword() {
+    handleChangePassword: async () => {
       const oldPass = document.getElementById('oldPassword').value;
       const newPass = document.getElementById('newPassword').value;
       const confirmPass = document.getElementById('confirmPassword').value;
