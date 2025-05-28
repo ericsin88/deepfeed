@@ -27,13 +27,15 @@
     #result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap; }
     .result-actions { margin-top: 10px; }
     .sortable-ghost { opacity: 0.5; background: #f8f9fa; }
+    .custom-input { margin-top: 10px; }
+    .custom-input input { width: 100%; padding: 8px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="header">
-    <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" class="logo" alt="Logo">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAB5SURBVDiN7ZMxDsAgCEOf6f9ftV66dKghMWZQW+1Q4AMJAFDVPKpVzQCwA8h3sW4hBmZ+9Y6I3gN6VlV3gJkfPc6qCgBwzj3G+QK01hIROOc+7y8g5xwRkYh8x/8Dq1XNAJBz/ge01g4BZj4BvPcX4Jz7Aqy1BwBmfgHWWgJwv0F/AAAAAElFTkSuQmCC" class="logo" alt="Logo">
     <button id="adminEntry">進入後台管理</button>
   </div>
   <h1 class="title">AI圖片/動畫提示詞生成器</h1>
@@ -182,21 +184,58 @@
       const container = document.getElementById('steps');
       const theme = App.themes[App.currentStep];
       
-      container.innerHTML = theme ? `
+      if (!theme) {
+        container.innerHTML = '<div class="step">暫無可用主題</div>';
+        return;
+      }
+
+      let optionsHTML = '';
+      
+      if (theme.is_text_input) {
+        // 纯文字输入模式
+        optionsHTML = `
+          <input type="text" class="text-input" 
+                 value="${App.selections[App.currentStep] || ''}"
+                 oninput="UI.handleInput(event)">
+        `;
+      } else {
+        // 选项模式
+        optionsHTML = theme.options.map(opt => `
+          <div class="option ${App.selections[App.currentStep] === opt ? 'selected' : ''}" 
+               onclick="UI.selectOption('${opt}')">${opt}</div>
+        `).join('');
+        
+        // 如果允许自定义输入，添加自定义输入框
+        if (theme.allow_custom) {
+          optionsHTML += `
+            <div class="custom-input">
+              <input type="text" 
+                     placeholder="自定義輸入"
+                     value="${App.selections[App.currentStep]?.startsWith('自定義:') ? 
+                            App.selections[App.currentStep].substring(4) : ''}"
+                     oninput="UI.handleCustomInput(event)">
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = `
         <div class="step">
           <h3>${theme.name}</h3>
           <div class="options">
-            ${theme.is_text_input ? `
-              <input type="text" class="text-input" 
-                     value="${App.selections[App.currentStep] || ''}"
-                     oninput="UI.handleInput(event)">
-            ` : theme.options.map(opt => `
-              <div class="option ${App.selections[App.currentStep] === opt ? 'selected' : ''}" 
-                   onclick="UI.selectOption('${opt}')">${opt}</div>
-            `).join('')}
+            ${optionsHTML}
           </div>
         </div>
-      ` : '<div class="step">暫無可用主題</div>';
+      `;
+    },
+    
+    handleCustomInput: function(e) {
+      const value = e.target.value;
+      if (value) {
+        App.selections[App.currentStep] = `自定義: ${value}`;
+      } else {
+        delete App.selections[App.currentStep];
+      }
     },
     
     selectOption: function(option) {
@@ -247,15 +286,29 @@
           sort_order: index + 1
         }));
 
+      // 只发送必要的字段
+      const updateData = updates.map(({ id, sort_order }) => ({ id, sort_order }));
+      
       const { error } = await window.supabase
         .from('themes')
-        .upsert(updates, { onConflict: 'id' });
+        .upsert(updateData);
       
-      if (!error) await this.loadThemes();
+      if (error) {
+        console.error('排序更新失败:', error);
+        return;
+      }
+      
+      // 重新加载主题并刷新UI
+      await this.loadThemes();
+      UI.renderThemeNav();
+      Admin.loadThemes();
     },
 
     initSortable() {
-      new Sortable(document.getElementById('themeList'), {
+      const themeList = document.getElementById('themeList');
+      if (!themeList) return;
+      
+      new Sortable(themeList, {
         animation: 150,
         ghostClass: 'sortable-ghost',
         onUpdate: async (evt) => {
@@ -263,7 +316,6 @@
             .map(el => el.dataset.id)
             .filter(id => id !== undefined);
           await this.updateThemeOrder(ids);
-          UI.renderThemeNav();
         }
       });
     },
@@ -279,20 +331,25 @@
         sort_order: App.themes.length + 1
       };
 
+      if (!newTheme.name) return alert('請輸入主題名稱！');
+      
       try {
         if (App.editingTheme) {
+          // 更新现有主题
           await window.supabase
             .from('themes')
             .update(newTheme)
             .eq('id', App.editingTheme);
         } else {
+          // 添加新主题
           await window.supabase
             .from('themes')
             .insert(newTheme);
         }
         
+        // 重新加载主题并刷新UI
         await this.loadThemes();
-        window.Admin.loadThemes();
+        Admin.loadThemes();
         this.clearThemeForm();
         alert('主題保存成功！');
       } catch (error) {
@@ -362,10 +419,14 @@
   window.Admin = {
     async loadThemes() {
       const container = document.getElementById('themeList');
+      if (!container) return;
+      
       container.innerHTML = App.themes.map(t => `
         <div class="theme-block" data-id="${t.id}">
           <h4>${t.name}</h4>
           <p>選項：${t.options?.join(', ') || '無'}</p>
+          <p>自定義：${t.allow_custom ? '允許' : '不允許'}</p>
+          <p>模式：${t.is_text_input ? '文字輸入' : '選項選擇'}</p>
           <div class="button-group">
             <button onclick="Admin.editTheme(${t.id})">編輯</button>
             <button onclick="Admin.deleteTheme(${t.id})">刪除</button>
