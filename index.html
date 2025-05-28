@@ -207,12 +207,12 @@
         
         // 如果允许自定义输入，添加自定义输入框
         if (theme.allow_custom) {
+          const customValue = App.selections[App.currentStep] || '';
           optionsHTML += `
             <div class="custom-input">
               <input type="text" 
                      placeholder="自定義輸入"
-                     value="${App.selections[App.currentStep]?.startsWith('自定義:') ? 
-                            App.selections[App.currentStep].substring(4) : ''}"
+                     value="${customValue}"
                      oninput="UI.handleCustomInput(event)">
             </div>
           `;
@@ -230,12 +230,7 @@
     },
     
     handleCustomInput: function(e) {
-      const value = e.target.value;
-      if (value) {
-        App.selections[App.currentStep] = `自定義: ${value}`;
-      } else {
-        delete App.selections[App.currentStep];
-      }
+      App.selections[App.currentStep] = e.target.value;
     },
     
     selectOption: function(option) {
@@ -246,6 +241,8 @@
 
   // 核心功能
   const Core = {
+    sortableInstance: null,
+    
     async init() {
       await this.loadData();
       this.initSortable();
@@ -263,10 +260,16 @@
     },
 
     async loadThemes() {
-      const { data } = await window.supabase
+      const { data, error } = await window.supabase
         .from('themes')
         .select('*')
         .order('sort_order', { ascending: true });
+      
+      if (error) {
+        console.error('加载主题失败:', error);
+        return;
+      }
+      
       App.themes = data || [];
     },
 
@@ -279,43 +282,53 @@
     },
 
     async updateThemeOrder(ids) {
-      const updates = ids
-        .filter(id => !isNaN(id))
-        .map((id, index) => ({
-          id: parseInt(id),
-          sort_order: index + 1
-        }));
+      const updates = ids.map((id, index) => ({
+        id: parseInt(id),
+        sort_order: index
+      }));
 
-      // 只发送必要的字段
-      const updateData = updates.map(({ id, sort_order }) => ({ id, sort_order }));
-      
-      const { error } = await window.supabase
-        .from('themes')
-        .upsert(updateData);
-      
-      if (error) {
-        console.error('排序更新失败:', error);
-        return;
+      // 批量更新排序值
+      for (const update of updates) {
+        const { error } = await window.supabase
+          .from('themes')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+        
+        if (error) {
+          console.error('更新排序失败:', error);
+          return false;
+        }
       }
       
-      // 重新加载主题并刷新UI
-      await this.loadThemes();
-      UI.renderThemeNav();
-      Admin.loadThemes();
+      return true;
     },
 
     initSortable() {
       const themeList = document.getElementById('themeList');
       if (!themeList) return;
       
-      new Sortable(themeList, {
+      // 销毁现有实例
+      if (this.sortableInstance) {
+        this.sortableInstance.destroy();
+      }
+      
+      this.sortableInstance = new Sortable(themeList, {
         animation: 150,
         ghostClass: 'sortable-ghost',
         onUpdate: async (evt) => {
           const ids = Array.from(evt.from.children)
             .map(el => el.dataset.id)
             .filter(id => id !== undefined);
-          await this.updateThemeOrder(ids);
+          
+          // 更新排序
+          const success = await this.updateThemeOrder(ids);
+          if (success) {
+            // 重新加载主题
+            await this.loadThemes();
+            // 刷新UI
+            UI.renderThemeNav();
+            Admin.loadThemes();
+          }
         }
       });
     },
@@ -328,7 +341,7 @@
           .filter(o => o.trim()),
         allow_custom: document.getElementById('allowCustom').checked,
         is_text_input: document.getElementById('isTextInput').checked,
-        sort_order: App.themes.length + 1
+        sort_order: App.themes.length
       };
 
       if (!newTheme.name) return alert('請輸入主題名稱！');
@@ -427,19 +440,37 @@
           <p>選項：${t.options?.join(', ') || '無'}</p>
           <p>自定義：${t.allow_custom ? '允許' : '不允許'}</p>
           <p>模式：${t.is_text_input ? '文字輸入' : '選項選擇'}</p>
+          <p>排序：${t.sort_order}</p>
           <div class="button-group">
             <button onclick="Admin.editTheme(${t.id})">編輯</button>
             <button onclick="Admin.deleteTheme(${t.id})">刪除</button>
           </div>
         </div>
       `).join('');
+      
+      // 重新初始化拖放功能
+      Core.initSortable();
     },
 
     async deleteTheme(id) {
       if (!confirm('確定要刪除這個主題嗎？')) return;
-      await window.supabase.from('themes').delete().eq('id', id);
-      await Core.loadThemes();
-      this.loadThemes();
+      
+      try {
+        // 删除主题
+        await window.supabase.from('themes').delete().eq('id', id);
+        
+        // 重新加载主题
+        await Core.loadThemes();
+        
+        // 刷新主题列表
+        this.loadThemes();
+        
+        // 刷新前台
+        UI.renderThemeNav();
+        UI.renderCurrentStep();
+      } catch (error) {
+        alert(`刪除失敗: ${error.message}`);
+      }
     },
 
     async editTheme(id) {
