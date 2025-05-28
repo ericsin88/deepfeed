@@ -206,7 +206,7 @@
   };
 
   // 核心功能
- const Core = {
+  const Core = {
     async init() {
       await this.loadData();
       this.initSortable();
@@ -216,8 +216,11 @@
       document.getElementById('frontend').classList.remove('hidden');
     },
 
-      async loadData() {
-      await Promise.all([this.loadThemes(), this.loadPassword()]);
+    async loadData() {
+      await Promise.all([
+        this.loadThemes(),
+        this.loadPassword()
+      ]);
     },
 
     async loadThemes() {
@@ -226,6 +229,14 @@
         .select('*')
         .order('sort_order', { ascending: true });
       App.themes = data || [];
+    },
+
+    async loadPassword() {
+      const { data } = await window.supabase
+        .from('passwords')
+        .select('password')
+        .single();
+      if (data) App.password = data.password;
     },
 
     async updateThemeOrder(ids) {
@@ -252,6 +263,7 @@
             .map(el => el.dataset.id)
             .filter(id => id !== undefined);
           await this.updateThemeOrder(ids);
+          UI.renderThemeNav();
         }
       });
     },
@@ -293,6 +305,9 @@
       const newPass = document.getElementById('newPassword').value;
       const confirmPass = document.getElementById('confirmPassword').value;
 
+      if (newPass !== confirmPass) return alert('新密碼與確認密碼不一致！');
+      if (oldPass !== App.password) return alert('舊密碼錯誤！');
+
       try {
         await window.supabase
           .from('passwords')
@@ -304,12 +319,6 @@
       } catch (error) {
         alert(`密碼修改失敗: ${error.message}`);
       }
-    },
-
-    clearPasswordForm() {
-      document.getElementById('oldPassword').value = '';
-      document.getElementById('newPassword').value = '';
-      document.getElementById('confirmPassword').value = '';
     },
 
     bindEvents() {
@@ -321,39 +330,18 @@
       
       // 后台事件
       document.getElementById('backToFrontBtn').addEventListener('click', () => UI.togglePanel('frontend'));
-      document.getElementById('loginBtn').addEventListener('click', this.handleLogin);
-      document.getElementById('saveThemeBtn').addEventListener('click', this.handleSaveTheme);
-      document.getElementById('changePasswordBtn').addEventListener('click', this.handleChangePassword);
+      document.getElementById('loginBtn').addEventListener('click', () => this.handleLogin());
+      document.getElementById('saveThemeBtn').addEventListener('click', () => this.handleSaveTheme());
+      document.getElementById('changePasswordBtn').addEventListener('click', () => this.handleChangePassword());
     },
 
-    handleLogin: async () => {
+    async handleLogin() {
       const inputPass = document.getElementById('password').value;
       if (inputPass === App.password) {
         UI.togglePanel('adminPanel');
         await Admin.loadThemes();
       } else {
         alert('密碼錯誤！');
-      }
-    },
-
-    handleChangePassword: async () => {
-      const oldPass = document.getElementById('oldPassword').value;
-      const newPass = document.getElementById('newPassword').value;
-      const confirmPass = document.getElementById('confirmPassword').value;
-
-      if (newPass !== confirmPass) return alert('新密碼與確認密碼不一致！');
-      if (oldPass !== App.password) return alert('舊密碼錯誤！');
-
-      try {
-        await window.supabase
-          .from('passwords')
-          .upsert({ id: 1, password: newPass });
-        
-        App.password = newPass;
-        alert('密碼修改成功！');
-        this.clearPasswordForm();
-      } catch (error) {
-        alert(`密碼修改失敗: ${error.message}`);
       }
     },
 
@@ -387,11 +375,11 @@
     },
 
     async deleteTheme(id) {
+      if (!confirm('確定要刪除這個主題嗎？')) return;
       await window.supabase.from('themes').delete().eq('id', id);
       await Core.loadThemes();
       this.loadThemes();
-    }
-  };
+    },
 
     async editTheme(id) {
       const theme = App.themes.find(t => t.id === id);
@@ -405,13 +393,8 @@
     }
   };
 
-  // 事件绑定
-  document.addEventListener('DOMContentLoaded', () => {
-  // 绑定核心事件
-    document.getElementById('saveThemeBtn').addEventListener('click', () => Core.handleSaveTheme());
-    document.getElementById('changePasswordBtn').addEventListener('click', () => Core.handleChangePassword());  
   // 啟動應用
- document.addEventListener('DOMContentLoaded', () => Core.init());
+  document.addEventListener('DOMContentLoaded', () => Core.init());
 })();
 </script>
 </body>
