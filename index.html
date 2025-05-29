@@ -47,6 +47,7 @@
       align-items: center;
       justify-content: space-between;
       z-index: 100;
+      height: 70px;
     }
     
     .logo-container {
@@ -60,18 +61,11 @@
       filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
     }
     
-    .app-title {
-      color: white;
-      font-size: 1.5rem;
-      font-weight: 600;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
     .theme-nav {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin: 70px 0 25px;
+      margin: 20px 0 25px;
       padding: 15px;
       background: white;
       border-radius: 10px;
@@ -225,19 +219,6 @@
       flex-wrap: wrap;
     }
     
-    .title {
-      position: absolute;
-      top: 75px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 1.8rem;
-      color: var(--primary-color);
-      font-weight: 700;
-      text-align: center;
-      width: 100%;
-      text-shadow: 0 2px 3px rgba(0,0,0,0.1);
-    }
-    
     #result {
       margin-top: 30px;
       padding: 25px;
@@ -380,11 +361,11 @@
     }
     
     button#generateBtn {
-      background: var(--success-color);
+      background: var(--accent-color);
     }
     
     button#generateBtn:hover {
-      background: #27ae60;
+      background: #8e44ad;
     }
     
     button#loginBtn {
@@ -446,28 +427,6 @@
       background: #edf2f7;
     }
     
-    .progress-container {
-      height: 8px;
-      background: #edf2f7;
-      border-radius: 4px;
-      margin: 25px 0 15px;
-      overflow: hidden;
-    }
-    
-    .progress-bar {
-      height: 100%;
-      background: var(--secondary-color);
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-    
-    .theme-count {
-      text-align: center;
-      color: #7f8c8d;
-      font-size: 0.9rem;
-      margin-bottom: 5px;
-    }
-    
     .admin-controls {
       display: flex;
       flex-wrap: wrap;
@@ -523,6 +482,8 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      opacity: 1;
+      transition: opacity 0.3s ease;
     }
     
     .notification.success {
@@ -532,6 +493,22 @@
     .notification.error {
       background: var(--danger-color);
     }
+    
+    .app-title {
+      color: var(--primary-color);
+      font-size: 1.8rem;
+      text-align: center;
+      margin: 20px 0;
+      font-weight: 700;
+    }
+    
+    .frontend-title {
+      text-align: center;
+      margin: 10px 0 30px;
+      font-size: 1.5rem;
+      color: var(--primary-color);
+      font-weight: 600;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -540,24 +517,19 @@
   <div class="header">
     <div class="logo-container">
       <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgM0g1YTIgMiAwIDAgMC0yIDJ2MTRhMiAyIDAgMCAwIDIgMmgxNGEyIDIgMCAwIDAgMi0ydi03Ij48L3BhdGg+PHBhdGggZD0iTTE4IDE1YTQgNCAwIDAgMS00IDRIMmwxMy0xM2E0IDQgMCAwIDEgNSA1eiI+PC9wYXRoPjwvc3ZnPg==" class="logo" alt="AI提示词生成器">
-      <div class="app-title">AI提示词生成器</div>
     </div>
     <button id="adminEntry">進入後台管理</button>
   </div>
-  <h1 class="title">AI圖片/動畫提示詞生成器</h1>
 
   <!-- 前台界面 -->
   <div id="frontend">
-    <div class="theme-count">主題: <span id="currentStep">1</span>/<span id="totalSteps">0</span></div>
-    <div class="progress-container">
-      <div class="progress-bar" id="progressBar" style="width: 0%"></div>
-    </div>
+    <h2 class="frontend-title">AI圖片/動畫提示詞生成器</h2>
     <div class="theme-nav" id="themeNav"></div>
     <div id="steps"></div>
     <div class="button-group">
       <button id="prevBtn">← 上一步</button>
       <button id="nextBtn">下一步 →</button>
-      <button id="generateBtn">生成提示詞</button>
+      <button id="generateBtn">直接生成Prompt</button>
     </div>
     <div id="result"></div>
   </div>
@@ -645,7 +617,6 @@
     prevStep: function() {
       if (App.currentStep > 0) {
         App.currentStep--;
-        this.updateProgress();
         this.renderThemeNav();
         this.renderCurrentStep();
       }
@@ -654,7 +625,6 @@
     nextStep: function() {
       if (App.currentStep < App.themes.length - 1) {
         App.currentStep++;
-        this.updateProgress();
         this.renderThemeNav();
         this.renderCurrentStep();
       } else {
@@ -680,8 +650,8 @@
           // 纯文字输入模式
           value = App.customInputs[i] || '';
         } else if (theme.allowMultiSelect) {
-          // 多选模式
-          value = App.multiSelections[i]?.join(', ') || '';
+          // 多选模式 - 使用自定义输入框内容（如果有），否则使用选项内容
+          value = App.customInputs[i] || App.multiSelections[i]?.join(', ') || '';
         } else {
           // 单选模式
           value = App.selections[i] || '';
@@ -711,7 +681,6 @@
       App.selections = {};
       App.multiSelections = {};
       App.customInputs = {};
-      this.updateProgress();
       this.renderThemeNav();
       this.renderCurrentStep();
       document.getElementById('result').innerHTML = '';
@@ -719,13 +688,6 @@
     
     handleInput: function(e) {
       App.customInputs[App.currentStep] = e.target.value;
-    },
-    
-    updateProgress: function() {
-      const progress = ((App.currentStep + 1) / App.themes.length) * 100;
-      document.getElementById('progressBar').style.width = `${progress}%`;
-      document.getElementById('currentStep').textContent = App.currentStep + 1;
-      document.getElementById('totalSteps').textContent = App.themes.length;
     },
     
     renderThemeNav: function() {
@@ -738,7 +700,6 @@
     
     jumpToStep: function(step) {
       App.currentStep = step;
-      this.updateProgress();
       this.renderThemeNav();
       this.renderCurrentStep();
     },
@@ -781,18 +742,21 @@
         
         // 如果允许自定义输入，添加自定义输入框
         if (theme.allow_custom) {
+          // 优先使用自定义输入框的值
+          const customValue = App.customInputs[stepIndex] || selectedOptions.join(', ');
+          
           optionsHTML += `
             <div class="custom-input">
               <input type="text" 
                      placeholder="自定義輸入 (選項將以逗號分隔)"
-                     value="${selectedOptions.join(', ') || ''}"
+                     value="${customValue}"
                      oninput="UI.handleMultiCustomInput(event)">
             </div>
           `;
         }
         
         // 显示已选标签
-        if (selectedOptions.length > 0) {
+        if (selectedOptions.length > 0 && !App.customInputs[stepIndex]) {
           optionsHTML += `
             <div class="selected-options">
               <h4>已選選項</h4>
@@ -852,6 +816,11 @@
         App.multiSelections[stepIndex].push(option);
       }
       
+      // 更新自定义输入框的值（如果存在）
+      if (App.customInputs[stepIndex]) {
+        App.customInputs[stepIndex] = App.multiSelections[stepIndex].join(', ');
+      }
+      
       this.renderCurrentStep();
     },
     
@@ -861,14 +830,27 @@
         const index = App.multiSelections[stepIndex].indexOf(option);
         if (index >= 0) {
           App.multiSelections[stepIndex].splice(index, 1);
+          
+          // 更新自定义输入框的值（如果存在）
+          if (App.customInputs[stepIndex]) {
+            App.customInputs[stepIndex] = App.multiSelections[stepIndex].join(', ');
+          }
+          
           this.renderCurrentStep();
         }
       }
     },
     
     handleMultiCustomInput: function(e) {
+      const stepIndex = App.currentStep;
       const value = e.target.value;
-      App.multiSelections[App.currentStep] = value.split(',').map(v => v.trim()).filter(v => v);
+      App.customInputs[stepIndex] = value;
+      
+      // 如果自定义输入框为空，清除多选数组
+      if (!value.trim()) {
+        App.multiSelections[stepIndex] = [];
+      }
+      
       this.renderCurrentStep();
     },
     
@@ -915,7 +897,6 @@
       this.bindEvents();
       UI.renderThemeNav();
       UI.renderCurrentStep();
-      UI.updateProgress();
       document.getElementById('frontend').classList.remove('hidden');
     },
 
@@ -1064,6 +1045,8 @@
             .eq('id', App.editingTheme);
           
           if (error) throw error;
+          
+          UI.showNotification('主題更新成功！', 'success');
         } else {
           // 添加新主题
           const { error } = await window.supabase
@@ -1071,13 +1054,14 @@
             .insert(newTheme);
             
           if (error) throw error;
+          
+          UI.showNotification('主題添加成功！', 'success');
         }
         
         // 重新加载主题并刷新UI
         await this.loadThemes();
         Admin.loadThemes();
         this.clearThemeForm();
-        UI.showNotification('主題保存成功！', 'success');
       } catch (error) {
         console.error('保存主题失败:', error);
         UI.showNotification(`保存失敗: ${error.message}`, 'error');
@@ -1204,7 +1188,6 @@
         // 刷新前台
         UI.renderThemeNav();
         UI.renderCurrentStep();
-        UI.updateProgress();
         
         UI.showNotification('主題已刪除！', 'success');
       } catch (error) {
