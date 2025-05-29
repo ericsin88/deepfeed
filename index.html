@@ -5,52 +5,559 @@
   <title>AI提示詞生成器</title>
   <link rel="icon" href="data:,">
   <style>
-    :root { --primary-color: #2c3e50; --secondary-color: #3498db; }
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 100px 20px 20px; }
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+      --accent-color: #9b59b6;
+      --success-color: #2ecc71;
+      --warning-color: #f39c12;
+      --danger-color: #e74c3c;
+      --light-bg: #f8f9fa;
+      --dark-text: #333;
+      --light-text: #fff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 100px 20px 20px;
+      background-color: #f5f7fa;
+      color: var(--dark-text);
+      line-height: 1.6;
+    }
+    
     .hidden { display: none; }
-    .header { position: fixed; top: 0; left: 0; right: 0; background: white; padding: 10px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; }
-    .logo { height: 40px; }
-    .theme-nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 70px 0 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
-    .theme-nav-item { padding: 8px 12px; cursor: pointer; border-radius: 3px; transition: all 0.3s; }
-    .theme-nav-item.active { background: var(--secondary-color); color: white; }
-    .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-    .option { margin: 5px; padding: 8px 12px; display: inline-block; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; transition: all 0.3s; }
-    .option.selected { background: var(--secondary-color); color: white; }
-    .option:hover { background: #f8f9fa; }
-    #adminPanel { background: #f8f9fa; padding: 20px; margin-top: 30px; border-radius: 5px; }
-    .theme-block { margin: 15px 0; padding: 15px; background: white; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .login-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); z-index: 1000; }
-    .text-input-mode input { width: 100%; padding: 8px; margin-top: 5px; }
-    #adminEntry { position: fixed; top: 20px; right: 20px; }
-    .button-group { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
-    .title { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); }
-    #result { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap; }
-    .result-actions { margin-top: 10px; }
-    .sortable-ghost { opacity: 0.5; background: #f8f9fa; }
-    .custom-input { margin-top: 10px; }
-    .custom-input input { width: 100%; padding: 8px; }
-    .multi-select-options { display: flex; flex-wrap: wrap; }
-    .multi-select-options .option { margin: 5px; }
-    .selected-options { margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+    
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, var(--primary-color), #1a2530);
+      padding: 10px 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 100;
+    }
+    
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .logo {
+      height: 45px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+    }
+    
+    .app-title {
+      color: white;
+      font-size: 1.5rem;
+      font-weight: 600;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .theme-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 70px 0 25px;
+      padding: 15px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    }
+    
+    .theme-nav-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      background: #f0f4f8;
+      font-weight: 500;
+      border: 2px solid transparent;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .theme-nav-item:hover {
+      background: #e3eaf3;
+      transform: translateY(-2px);
+    }
+    
+    .theme-nav-item.active {
+      background: var(--secondary-color);
+      color: white;
+      border-color: #2980b9;
+      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+    }
+    
+    .step {
+      margin: 25px 0;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border-left: 4px solid var(--secondary-color);
+      transition: all 0.3s ease;
+    }
+    
+    .step h3 {
+      margin-bottom: 15px;
+      color: var(--primary-color);
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .step h3:before {
+      content: "•";
+      color: var(--secondary-color);
+      font-size: 1.8rem;
+    }
+    
+    .option {
+      margin: 8px;
+      padding: 12px 18px;
+      display: inline-block;
+      border: 2px solid #e0e6ed;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      font-weight: 500;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    .option:hover {
+      border-color: var(--secondary-color);
+      background: #f0f7ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.15);
+    }
+    
+    .option.selected {
+      background: var(--secondary-color);
+      color: white;
+      border-color: #2980b9;
+      box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+    }
+    
+    #adminPanel {
+      background: white;
+      padding: 25px;
+      margin-top: 30px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    }
+    
+    .theme-block {
+      margin: 20px 0;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #eaeff5;
+    }
+    
+    .login-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 30px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      z-index: 1000;
+      width: 90%;
+      max-width: 450px;
+    }
+    
+    .text-input-mode input {
+      width: 100%;
+      padding: 12px 15px;
+      margin-top: 10px;
+      border: 2px solid #e0e6ed;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    
+    .text-input-mode input:focus {
+      border-color: var(--secondary-color);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    }
+    
+    #adminEntry {
+      background: white;
+      color: var(--primary-color);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    #adminEntry:hover {
+      background: #f0f4f8;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    .button-group {
+      margin-top: 25px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .title {
+      position: absolute;
+      top: 75px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.8rem;
+      color: var(--primary-color);
+      font-weight: 700;
+      text-align: center;
+      width: 100%;
+      text-shadow: 0 2px 3px rgba(0,0,0,0.1);
+    }
+    
+    #result {
+      margin-top: 30px;
+      padding: 25px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      white-space: pre-wrap;
+      border-top: 4px solid var(--success-color);
+    }
+    
+    #result pre {
+      font-family: 'Consolas', 'Courier New', monospace;
+      line-height: 1.5;
+      padding: 15px;
+      background: #f8fafc;
+      border-radius: 8px;
+      overflow-x: auto;
+      border-left: 3px solid var(--secondary-color);
+    }
+    
+    .result-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .sortable-ghost { 
+      opacity: 0.5; 
+      background: #f0f7ff; 
+    }
+    
+    .custom-input {
+      margin-top: 20px;
+    }
+    
+    .custom-input input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e6ed;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    
+    .custom-input input:focus {
+      border-color: var(--secondary-color);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    }
+    
+    .multi-select-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .multi-select-options .option {
+      margin: 0;
+    }
+    
+    .selected-options {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f7ff;
+      border-radius: 8px;
+      border: 1px dashed var(--secondary-color);
+    }
+    
+    .selected-options h4 {
+      margin-bottom: 10px;
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .selected-options h4:before {
+      content: "✓";
+      color: var(--success-color);
+    }
+    
+    .selected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .tag {
+      padding: 6px 12px;
+      background: var(--secondary-color);
+      color: white;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .tag-remove {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1rem;
+      padding: 0 3px;
+    }
+    
+    button {
+      padding: 12px 24px;
+      background: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    button:hover {
+      background: #2980b9;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(52, 152, 219, 0.4);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button#prevBtn, button#backToFrontBtn {
+      background: #7f8c8d;
+    }
+    
+    button#prevBtn:hover, button#backToFrontBtn:hover {
+      background: #6c7a7d;
+    }
+    
+    button#generateBtn {
+      background: var(--success-color);
+    }
+    
+    button#generateBtn:hover {
+      background: #27ae60;
+    }
+    
+    button#loginBtn {
+      background: var(--success-color);
+    }
+    
+    button#saveThemeBtn {
+      background: var(--accent-color);
+    }
+    
+    button#changePasswordBtn {
+      background: #16a085;
+    }
+    
+    button.delete-btn {
+      background: var(--danger-color);
+    }
+    
+    input, textarea, select {
+      padding: 12px 15px;
+      border: 2px solid #e0e6ed;
+      border-radius: 8px;
+      font-size: 1rem;
+      width: 100%;
+      margin-bottom: 15px;
+      transition: border-color 0.3s;
+    }
+    
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--secondary-color);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    }
+    
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    
+    .option-settings {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    
+    .option-settings label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    
+    .option-settings label:hover {
+      background: #edf2f7;
+    }
+    
+    .progress-container {
+      height: 8px;
+      background: #edf2f7;
+      border-radius: 4px;
+      margin: 25px 0 15px;
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: var(--secondary-color);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    
+    .theme-count {
+      text-align: center;
+      color: #7f8c8d;
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+    
+    .admin-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .admin-controls button {
+      flex: 1;
+      min-width: 150px;
+    }
+    
+    .password-field {
+      position: relative;
+    }
+    
+    .password-toggle {
+      position: absolute;
+      right: 15px;
+      top: 14px;
+      cursor: pointer;
+      color: #7f8c8d;
+    }
+    
+    h2, h3, h4 {
+      color: var(--primary-color);
+      margin-bottom: 15px;
+    }
+    
+    h2 {
+      font-size: 1.8rem;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    
+    .login-panel h2 {
+      color: var(--primary-color);
+    }
+    
+    .theme-block h3 {
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #f0f4f8;
+    }
+    
+    .notification {
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .notification.success {
+      background: var(--success-color);
+    }
+    
+    .notification.error {
+      background: var(--danger-color);
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="header">
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAB5SURBVDiN7ZMxDsAgCEOf6f9ftV66dKghMWZQW+1Q4AMJAFDVPKpVzQCwA8h3sW4hBmZ+9Y6I3gN6VlV3gJkfPc6qCgBwzj3G+QK01hIROOc+7y8g5xwRkYh8x/8Dq1XNAJBz/ge01g4BZj4BvPcX4Jz7Aqy1BwBmfgHWWgJwv0F/AAAAAElFTkSuQmCC" class="logo" alt="Logo">
+    <div class="logo-container">
+      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgM0g1YTIgMiAwIDAgMC0yIDJ2MTRhMiAyIDAgMCAwIDIgMmgxNGEyIDIgMCAwIDAgMi0ydi03Ij48L3BhdGg+PHBhdGggZD0iTTE4IDE1YTQgNCAwIDAgMS00IDRIMmwxMy0xM2E0IDQgMCAwIDEgNSA1eiI+PC9wYXRoPjwvc3ZnPg==" class="logo" alt="AI提示词生成器">
+      <div class="app-title">AI提示词生成器</div>
+    </div>
     <button id="adminEntry">進入後台管理</button>
   </div>
   <h1 class="title">AI圖片/動畫提示詞生成器</h1>
 
   <!-- 前台界面 -->
   <div id="frontend">
+    <div class="theme-count">主題: <span id="currentStep">1</span>/<span id="totalSteps">0</span></div>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+    </div>
     <div class="theme-nav" id="themeNav"></div>
     <div id="steps"></div>
     <div class="button-group">
-      <button id="prevBtn">上一步</button>
-      <button id="nextBtn">下一步</button>
-      <button id="generateBtn">直接生成</button>
+      <button id="prevBtn">← 上一步</button>
+      <button id="nextBtn">下一步 →</button>
+      <button id="generateBtn">生成提示詞</button>
     </div>
     <div id="result"></div>
   </div>
@@ -58,7 +565,11 @@
   <!-- 登入面板 -->
   <div id="loginPanel" class="hidden login-panel">
     <h2>後台管理登入</h2>
-    <input type="password" id="password" placeholder="輸入密碼">
+    <div class="password-field">
+      <input type="password" id="password" placeholder="輸入管理密碼">
+      <span class="password-toggle" id="passwordToggle">👁️</span>
+    </div>
+    <div id="loginMessage" class="notification hidden"></div>
     <div class="button-group">
       <button id="loginBtn">登入</button>
       <button id="cancelBtn">取消</button>
@@ -67,13 +578,23 @@
 
   <!-- 後台管理 -->
   <div id="adminPanel" class="hidden">
-    <button id="backToFrontBtn">返回前台</button>
+    <button id="backToFrontBtn">← 返回前台</button>
     
     <div class="theme-block">
       <h3>修改管理密碼</h3>
-      <input type="password" id="oldPassword" placeholder="舊密碼">
-      <input type="password" id="newPassword" placeholder="新密碼">
-      <input type="password" id="confirmPassword" placeholder="確認新密碼">
+      <div class="password-field">
+        <input type="password" id="oldPassword" placeholder="舊密碼">
+        <span class="password-toggle" id="oldPasswordToggle">👁️</span>
+      </div>
+      <div class="password-field">
+        <input type="password" id="newPassword" placeholder="新密碼">
+        <span class="password-toggle" id="newPasswordToggle">👁️</span>
+      </div>
+      <div class="password-field">
+        <input type="password" id="confirmPassword" placeholder="確認新密碼">
+        <span class="password-toggle" id="confirmPasswordToggle">👁️</span>
+      </div>
+      <div id="passwordMessage" class="notification hidden"></div>
       <button id="changePasswordBtn">修改密碼</button>
     </div>
 
@@ -86,6 +607,7 @@
         <label><input type="checkbox" id="isTextInput"> 純文字輸入模式</label>
         <label><input type="checkbox" id="allowMultiSelect"> 容許主題作多項選擇</label>
       </div>
+      <div id="themeMessage" class="notification hidden"></div>
       <button id="saveThemeBtn">保存主題</button>
     </div>
 
@@ -107,6 +629,7 @@
     currentStep: 0,
     selections: {},
     multiSelections: {},
+    customInputs: {},
     themes: [],
     password: 'admin123',
     editingTheme: null
@@ -122,6 +645,7 @@
     prevStep: function() {
       if (App.currentStep > 0) {
         App.currentStep--;
+        this.updateProgress();
         this.renderThemeNav();
         this.renderCurrentStep();
       }
@@ -130,6 +654,7 @@
     nextStep: function() {
       if (App.currentStep < App.themes.length - 1) {
         App.currentStep++;
+        this.updateProgress();
         this.renderThemeNav();
         this.renderCurrentStep();
       } else {
@@ -141,10 +666,11 @@
       const filtered = App.themes.filter((t, i) => {
         // 检查是否有选择（单选、多选或自定义输入）
         return App.selections[i] || 
-               (App.multiSelections[i] && App.multiSelections[i].length > 0);
+               (App.multiSelections[i] && App.multiSelections[i].length > 0) ||
+               (t.is_text_input && App.customInputs[i]);
       });
       
-      if (filtered.length === 0) return alert('請至少選擇一個選項！');
+      if (filtered.length === 0) return this.showNotification('請至少選擇一個選項！', 'error');
       
       const result = filtered.map((t, i) => {
         let value = '';
@@ -152,7 +678,7 @@
         
         if (theme.is_text_input) {
           // 纯文字输入模式
-          value = App.selections[i] || '';
+          value = App.customInputs[i] || '';
         } else if (theme.allowMultiSelect) {
           // 多选模式
           value = App.multiSelections[i]?.join(', ') || '';
@@ -175,20 +701,31 @@
     
     copyResult: function() {
       const text = document.querySelector('#result pre').textContent;
-      navigator.clipboard.writeText(text).then(() => alert('已複製到剪貼簿！'));
+      navigator.clipboard.writeText(text).then(() => {
+        this.showNotification('提示詞已複製到剪貼簿！', 'success', 2000);
+      });
     },
     
     reset: function() {
       App.currentStep = 0;
       App.selections = {};
       App.multiSelections = {};
+      App.customInputs = {};
+      this.updateProgress();
       this.renderThemeNav();
       this.renderCurrentStep();
       document.getElementById('result').innerHTML = '';
     },
     
     handleInput: function(e) {
-      App.selections[App.currentStep] = e.target.value;
+      App.customInputs[App.currentStep] = e.target.value;
+    },
+    
+    updateProgress: function() {
+      const progress = ((App.currentStep + 1) / App.themes.length) * 100;
+      document.getElementById('progressBar').style.width = `${progress}%`;
+      document.getElementById('currentStep').textContent = App.currentStep + 1;
+      document.getElementById('totalSteps').textContent = App.themes.length;
     },
     
     renderThemeNav: function() {
@@ -201,6 +738,7 @@
     
     jumpToStep: function(step) {
       App.currentStep = step;
+      this.updateProgress();
       this.renderThemeNav();
       this.renderCurrentStep();
     },
@@ -220,9 +758,12 @@
       if (theme.is_text_input) {
         // 纯文字输入模式 - 忽略多选和自定义
         optionsHTML = `
-          <input type="text" class="text-input" 
-                 value="${App.selections[stepIndex] || ''}"
-                 oninput="UI.handleInput(event)">
+          <div class="text-input-mode">
+            <input type="text" class="text-input" 
+                   value="${App.customInputs[stepIndex] || ''}"
+                   oninput="UI.handleInput(event)"
+                   placeholder="請輸入${theme.name}">
+          </div>
         `;
       } else if (theme.allowMultiSelect) {
         // 多选模式
@@ -233,7 +774,7 @@
             ${theme.options.map(opt => `
               <div class="option ${selectedOptions.includes(opt) ? 'selected' : ''}" 
                    data-value="${opt}"
-                   onclick="UI.toggleMultiOption('${opt}')">${opt}</div>
+                   onclick="UI.toggleMultiOption('${opt.replace(/'/g, "\\'")}')">${opt}</div>
             `).join('')}
           </div>
         `;
@@ -249,11 +790,28 @@
             </div>
           `;
         }
+        
+        // 显示已选标签
+        if (selectedOptions.length > 0) {
+          optionsHTML += `
+            <div class="selected-options">
+              <h4>已選選項</h4>
+              <div class="selected-tags">
+                ${selectedOptions.map(opt => `
+                  <div class="tag">
+                    ${opt}
+                    <span class="tag-remove" onclick="UI.removeMultiOption('${opt.replace(/'/g, "\\'")}')">×</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
       } else {
         // 单选模式
         optionsHTML = theme.options.map(opt => `
           <div class="option ${App.selections[stepIndex] === opt ? 'selected' : ''}" 
-               onclick="UI.selectOption('${opt}')">${opt}</div>
+               onclick="UI.selectOption('${opt.replace(/'/g, "\\'")}')">${opt}</div>
         `).join('');
         
         // 如果允许自定义输入，添加自定义输入框
@@ -297,6 +855,17 @@
       this.renderCurrentStep();
     },
     
+    removeMultiOption: function(option) {
+      const stepIndex = App.currentStep;
+      if (App.multiSelections[stepIndex]) {
+        const index = App.multiSelections[stepIndex].indexOf(option);
+        if (index >= 0) {
+          App.multiSelections[stepIndex].splice(index, 1);
+          this.renderCurrentStep();
+        }
+      }
+    },
+    
     handleMultiCustomInput: function(e) {
       const value = e.target.value;
       App.multiSelections[App.currentStep] = value.split(',').map(v => v.trim()).filter(v => v);
@@ -310,6 +879,29 @@
     selectOption: function(option) {
       App.selections[App.currentStep] = option;
       this.renderCurrentStep();
+    },
+    
+    showNotification: function(message, type, duration = 3000) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.innerHTML = message;
+      
+      const container = type === 'error' ? document.body : document.getElementById('result');
+      container.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, duration);
+    },
+    
+    togglePassword: function(inputId) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+      } else {
+        input.type = 'password';
+      }
     }
   };
 
@@ -323,6 +915,7 @@
       this.bindEvents();
       UI.renderThemeNav();
       UI.renderCurrentStep();
+      UI.updateProgress();
       document.getElementById('frontend').classList.remove('hidden');
     },
 
@@ -334,25 +927,54 @@
     },
 
     async loadThemes() {
-      const { data, error } = await window.supabase
-        .from('themes')
-        .select('*')
-        .order('sort_order', { ascending: true });
-      
-      if (error) {
+      try {
+        const { data, error } = await window.supabase
+          .from('themes')
+          .select('*')
+          .order('sort_order', { ascending: true });
+        
+        if (error) {
+          throw error;
+        }
+        
+        App.themes = data || [];
+      } catch (error) {
         console.error('加载主题失败:', error);
-        return;
+        // 使用默认主题作为后备
+        App.themes = [
+          {
+            id: 1,
+            name: '艺术风格',
+            options: ['写实主义', '印象派', '抽象艺术', '超现实主义', '卡通风格'],
+            allow_custom: true,
+            is_text_input: false,
+            allowMultiSelect: false,
+            sort_order: 0
+          },
+          {
+            id: 2,
+            name: '主题内容',
+            options: ['自然风景', '城市风光', '人物肖像', '科幻场景', '动物世界'],
+            allow_custom: true,
+            is_text_input: false,
+            allowMultiSelect: true,
+            sort_order: 1
+          }
+        ];
       }
-      
-      App.themes = data || [];
     },
 
     async loadPassword() {
-      const { data } = await window.supabase
-        .from('passwords')
-        .select('password')
-        .single();
-      if (data) App.password = data.password;
+      try {
+        const { data } = await window.supabase
+          .from('passwords')
+          .select('password')
+          .single();
+        if (data) App.password = data.password;
+      } catch (error) {
+        console.error('加载密码失败:', error);
+        App.password = 'admin123';
+      }
     },
 
     async updateThemeOrder(ids) {
@@ -408,40 +1030,57 @@
     },
 
     async handleSaveTheme() {
+      const nameInput = document.getElementById('newThemeName');
+      const optionsInput = document.getElementById('newThemeOptions');
+      
       const newTheme = {
-        name: document.getElementById('newThemeName').value.trim(),
-        options: document.getElementById('newThemeOptions').value
+        name: nameInput.value.trim(),
+        options: optionsInput.value
           .split('\n')
-          .filter(o => o.trim()),
+          .map(o => o.trim())
+          .filter(o => o),
         allow_custom: document.getElementById('allowCustom').checked,
         is_text_input: document.getElementById('isTextInput').checked,
         allowMultiSelect: document.getElementById('allowMultiSelect').checked,
         sort_order: App.themes.length
       };
 
-      if (!newTheme.name) return alert('請輸入主題名稱！');
+      if (!newTheme.name) {
+        UI.showNotification('請輸入主題名稱！', 'error');
+        return;
+      }
+      
+      if (!newTheme.is_text_input && newTheme.options.length === 0) {
+        UI.showNotification('請至少輸入一個選項！', 'error');
+        return;
+      }
       
       try {
         if (App.editingTheme) {
           // 更新现有主题
-          await window.supabase
+          const { error } = await window.supabase
             .from('themes')
             .update(newTheme)
             .eq('id', App.editingTheme);
+          
+          if (error) throw error;
         } else {
           // 添加新主题
-          await window.supabase
+          const { error } = await window.supabase
             .from('themes')
             .insert(newTheme);
+            
+          if (error) throw error;
         }
         
         // 重新加载主题并刷新UI
         await this.loadThemes();
         Admin.loadThemes();
         this.clearThemeForm();
-        alert('主題保存成功！');
+        UI.showNotification('主題保存成功！', 'success');
       } catch (error) {
-        alert(`保存失敗: ${error.message}`);
+        console.error('保存主题失败:', error);
+        UI.showNotification(`保存失敗: ${error.message}`, 'error');
       }
     },
 
@@ -450,19 +1089,29 @@
       const newPass = document.getElementById('newPassword').value;
       const confirmPass = document.getElementById('confirmPassword').value;
 
-      if (newPass !== confirmPass) return alert('新密碼與確認密碼不一致！');
-      if (oldPass !== App.password) return alert('舊密碼錯誤！');
+      if (newPass !== confirmPass) {
+        UI.showNotification('新密碼與確認密碼不一致！', 'error');
+        return;
+      }
+      
+      if (oldPass !== App.password) {
+        UI.showNotification('舊密碼錯誤！', 'error');
+        return;
+      }
 
       try {
-        await window.supabase
+        const { error } = await window.supabase
           .from('passwords')
           .upsert({ id: 1, password: newPass });
         
+        if (error) throw error;
+        
         App.password = newPass;
         this.clearPasswordForm();
-        alert('密碼修改成功！');
+        UI.showNotification('密碼修改成功！', 'success');
       } catch (error) {
-        alert(`密碼修改失敗: ${error.message}`);
+        console.error('修改密码失败:', error);
+        UI.showNotification(`密碼修改失敗: ${error.message}`, 'error');
       }
     },
 
@@ -478,6 +1127,13 @@
       document.getElementById('loginBtn').addEventListener('click', () => this.handleLogin());
       document.getElementById('saveThemeBtn').addEventListener('click', () => this.handleSaveTheme());
       document.getElementById('changePasswordBtn').addEventListener('click', () => this.handleChangePassword());
+      document.getElementById('cancelBtn').addEventListener('click', () => UI.togglePanel('frontend'));
+      
+      // 密码显示/隐藏
+      document.getElementById('passwordToggle').addEventListener('click', () => UI.togglePassword('password'));
+      document.getElementById('oldPasswordToggle').addEventListener('click', () => UI.togglePassword('oldPassword'));
+      document.getElementById('newPasswordToggle').addEventListener('click', () => UI.togglePassword('newPassword'));
+      document.getElementById('confirmPasswordToggle').addEventListener('click', () => UI.togglePassword('confirmPassword'));
     },
 
     async handleLogin() {
@@ -486,7 +1142,7 @@
         UI.togglePanel('adminPanel');
         await Admin.loadThemes();
       } else {
-        alert('密碼錯誤！');
+        UI.showNotification('密碼錯誤！', 'error');
       }
     },
 
@@ -520,9 +1176,9 @@
           <p>多選：${t.allowMultiSelect ? '允許' : '不允許'}</p>
           <p>模式：${t.is_text_input ? '文字輸入' : '選項選擇'}</p>
           <p>排序：${t.sort_order}</p>
-          <div class="button-group">
+          <div class="admin-controls">
             <button onclick="Admin.editTheme(${t.id})">編輯</button>
-            <button onclick="Admin.deleteTheme(${t.id})">刪除</button>
+            <button class="delete-btn" onclick="Admin.deleteTheme(${t.id})">刪除</button>
           </div>
         </div>
       `).join('');
@@ -536,7 +1192,8 @@
       
       try {
         // 删除主题
-        await window.supabase.from('themes').delete().eq('id', id);
+        const { error } = await window.supabase.from('themes').delete().eq('id', id);
+        if (error) throw error;
         
         // 重新加载主题
         await Core.loadThemes();
@@ -547,8 +1204,12 @@
         // 刷新前台
         UI.renderThemeNav();
         UI.renderCurrentStep();
+        UI.updateProgress();
+        
+        UI.showNotification('主題已刪除！', 'success');
       } catch (error) {
-        alert(`刪除失敗: ${error.message}`);
+        console.error('删除主题失败:', error);
+        UI.showNotification(`刪除失敗: ${error.message}`, 'error');
       }
     },
 
@@ -562,6 +1223,9 @@
       document.getElementById('isTextInput').checked = theme.is_text_input;
       document.getElementById('allowMultiSelect').checked = theme.allowMultiSelect || false;
       App.editingTheme = id;
+      
+      // 滚动到表单
+      document.getElementById('newThemeName').scrollIntoView({ behavior: 'smooth' });
     }
   };
 
