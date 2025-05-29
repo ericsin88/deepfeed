@@ -497,21 +497,6 @@
       background: var(--secondary-color);
     }
     
-    .progress-container {
-      height: 8px;
-      background: #edf2f7;
-      border-radius: 4px;
-      margin: 25px 0 15px;
-      overflow: hidden;
-    }
-    
-    .progress-bar {
-      height: 100%;
-      background: var(--secondary-color);
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-    
     .app-container {
       max-width: 1000px;
       margin: 0 auto;
@@ -576,7 +561,7 @@
 <body>
   <div class="header">
     <div class="logo-container">
-      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgM0g1YTIgMiAwIDAgMC0yIDJ2MTRhMiAyIDAgMCAwIDIgMmgxNGEyIDIgMCAwIDAgMi0ydi03Ij48L3BhdGg+PHBhdGggZD0iTTE4IDE1YTQgNCAwIDAgMS00IDRIMmwxMy0xM2E0IDQgMCAwIDEgNSA1eiI+PC9wYXRoPjwvc3ZnPg==" class="logo" alt="AI提示词生成器">
+      <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" class="logo" alt="AI提示词生成器">
     </div>
     <button id="adminEntry">進入後台管理</button>
   </div>
@@ -600,7 +585,7 @@
     <div id="loginPanel" class="hidden login-panel">
       <h2>後台管理登入</h2>
       <div class="password-field">
-        <input type="password" id="password" placeholder="輸入管理密碼">
+        <input type="password" id="password" placeholder="輸入管理密碼" name="password">
         <span class="password-toggle" id="passwordToggle">👁️</span>
       </div>
       <div id="loginMessage" class="notification hidden"></div>
@@ -617,15 +602,15 @@
       <div class="theme-block">
         <h3>修改管理密碼</h3>
         <div class="password-field">
-          <input type="password" id="oldPassword" placeholder="舊密碼">
+          <input type="password" id="oldPassword" placeholder="舊密碼" name="oldPassword">
           <span class="password-toggle" id="oldPasswordToggle">👁️</span>
         </div>
         <div class="password-field">
-          <input type="password" id="newPassword" placeholder="新密碼">
+          <input type="password" id="newPassword" placeholder="新密碼" name="newPassword">
           <span class="password-toggle" id="newPasswordToggle">👁️</span>
         </div>
         <div class="password-field">
-          <input type="password" id="confirmPassword" placeholder="確認新密碼">
+          <input type="password" id="confirmPassword" placeholder="確認新密碼" name="confirmPassword">
           <span class="password-toggle" id="confirmPasswordToggle">👁️</span>
         </div>
         <div id="passwordMessage" class="notification hidden"></div>
@@ -634,12 +619,12 @@
 
       <div class="theme-block">
         <h3>新增/編輯主題</h3>
-        <input type="text" id="newThemeName" placeholder="主題名稱">
-        <textarea id="newThemeOptions" placeholder="輸入選項（每行一個）" rows="5"></textarea>
+        <input type="text" id="newThemeName" placeholder="主題名稱" name="themeName">
+        <textarea id="newThemeOptions" placeholder="輸入選項（每行一個）" rows="5" name="themeOptions"></textarea>
         <div class="option-settings">
-          <label><input type="checkbox" id="allowCustom"> 允許自定義輸入</label>
-          <label><input type="checkbox" id="isTextInput"> 純文字輸入模式</label>
-          <label><input type="checkbox" id="allowMultiSelect"> 容許主題作多項選擇</label>
+          <label><input type="checkbox" id="allowCustom" name="allowCustom"> 允許自定義輸入</label>
+          <label><input type="checkbox" id="isTextInput" name="isTextInput"> 純文字輸入模式</label>
+          <label><input type="checkbox" id="allowMultiSelect" name="allowMultiSelect"> 容許主題作多項選擇</label>
         </div>
         <div id="themeMessage" class="notification hidden"></div>
         <button id="saveThemeBtn">保存主題</button>
@@ -696,16 +681,8 @@
     },
     
     generateResult: function() {
-      const filtered = App.themes.filter((t, i) => {
-        // 检查是否有选择（单选、多选或自定义输入）
-        return App.selections[i] || 
-               (App.multiSelections[i] && App.multiSelections[i].length > 0) ||
-               (t.is_text_input && App.customInputs[i]);
-      });
-      
-      if (filtered.length === 0) return this.showNotification('請至少選擇一個選項！', 'error');
-      
-      const result = filtered.map((t, i) => {
+      // 确保所有主题的选择都被正确收集
+      const result = App.themes.map((t, i) => {
         let value = '';
         const theme = App.themes[i];
         
@@ -720,11 +697,15 @@
           value = App.selections[i] || '';
         }
         
-        return `${t.name}: ${value}`;
-      }).join('\n');
+        return {theme: t.name, value: value};
+      }).filter(item => item.value.trim() !== '');
+      
+      if (result.length === 0) return this.showNotification('請至少選擇一個選項！', 'error');
+      
+      const resultText = result.map(item => `${item.theme}: ${item.value}`).join('\n');
       
       document.getElementById('result').innerHTML = `
-        <pre>${result}</pre>
+        <pre>${resultText}</pre>
         <div class="result-actions">
           <button onclick="UI.copyResult()">複製提示詞</button>
           <button onclick="UI.reset()">重新開始</button>
@@ -786,7 +767,8 @@
             <input type="text" class="text-input" 
                    value="${App.customInputs[stepIndex] || ''}"
                    oninput="UI.handleInput(event)"
-                   placeholder="請輸入${theme.name}">
+                   placeholder="請輸入${theme.name}"
+                   name="text-input-${stepIndex}">
           </div>
         `;
       } else if (theme.allowMultiSelect) {
@@ -809,8 +791,9 @@
             <div class="custom-input">
               <input type="text" 
                      placeholder="自定義輸入 (可自由編輯)"
-                     value="${App.customInputs[stepIndex] || App.multiSelections[stepIndex]?.join(', ') || ''}"
-                     oninput="UI.handleMultiCustomInput(event)">
+                     value="${App.customInputs[stepIndex] || ''}"
+                     oninput="UI.handleMultiCustomInput(event)"
+                     name="multi-custom-${stepIndex}">
             </div>
           `;
         }
@@ -828,7 +811,8 @@
               <input type="text" 
                      placeholder="自定義輸入"
                      value="${App.selections[stepIndex] || ''}"
-                     oninput="UI.handleCustomInput(event)">
+                     oninput="UI.handleCustomInput(event)"
+                     name="custom-input-${stepIndex}">
             </div>
           `;
         }
@@ -956,6 +940,24 @@
             is_text_input: false,
             allowMultiSelect: true,
             sort_order: 1
+          },
+          {
+            id: 3,
+            name: '材质',
+            options: ['油画质感', '水彩风格', '素描效果', '3D渲染', '像素艺术'],
+            allow_custom: true,
+            is_text_input: false,
+            allowMultiSelect: true,
+            sort_order: 2
+          },
+          {
+            id: 4,
+            name: '灯光效果',
+            options: ['自然光', '戏剧性灯光', '霓虹灯光', '柔光', '逆光效果'],
+            allow_custom: true,
+            is_text_input: false,
+            allowMultiSelect: true,
+            sort_order: 3
           }
         ];
       }
