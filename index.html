@@ -29,16 +29,19 @@
     .sortable-ghost { opacity: 0.5; background: #f8f9fa; }
     .custom-input { margin-top: 10px; }
     .custom-input input { width: 100%; padding: 8px; }
+    .multi-select-options { display: flex; flex-wrap: wrap; }
+    .multi-select-options .option { margin: 5px; }
+    .selected-options { margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="header">
-    <img src="https://ericsin88.github.io/deepfeed/deepfeed_logo.png" class="logo" alt="Logo">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAB5SURBVDiN7ZMxDsAgCEOf6f9ftV66dKghMWZQW+1Q4AMJAFDVPKpVzQCwA8h3sW4hBmZ+9Y6I3gN6VlV3gJkfPc6qCgBwzj3G+QK01hIROOc+7y8g5xwRkYh8x/8Dq1XNAJBz/ge01g4BZj4BvPcX4Jz7Aqy1BwBmfgHWWgJwv0F/AAAAAElFTkSuQmCC" class="logo" alt="Logo">
     <button id="adminEntry">進入後台管理</button>
   </div>
-  <h1 class="title">AI圖片/動畫Prompt生成器</h1>
+  <h1 class="title">AI圖片/動畫提示詞生成器</h1>
 
   <!-- 前台界面 -->
   <div id="frontend">
@@ -81,6 +84,7 @@
       <div class="option-settings">
         <label><input type="checkbox" id="allowCustom"> 允許自定義輸入</label>
         <label><input type="checkbox" id="isTextInput"> 純文字輸入模式</label>
+        <label><input type="checkbox" id="allowMultiSelect"> 容許主題作多項選擇</label>
       </div>
       <button id="saveThemeBtn">保存主題</button>
     </div>
@@ -102,6 +106,7 @@
   window.App = {
     currentStep: 0,
     selections: {},
+    multiSelections: {},
     themes: [],
     password: 'admin123',
     editingTheme: null
@@ -133,12 +138,31 @@
     },
     
     generateResult: function() {
-      const filtered = App.themes.filter((t, i) => App.selections[i]);
+      const filtered = App.themes.filter((t, i) => {
+        // 检查是否有选择（单选、多选或自定义输入）
+        return App.selections[i] || 
+               (App.multiSelections[i] && App.multiSelections[i].length > 0);
+      });
+      
       if (filtered.length === 0) return alert('請至少選擇一個選項！');
       
-      const result = filtered
-        .map((t, i) => `${t.name}: ${App.selections[i]}`)
-        .join('\n');
+      const result = filtered.map((t, i) => {
+        let value = '';
+        const theme = App.themes[i];
+        
+        if (theme.is_text_input) {
+          // 纯文字输入模式
+          value = App.selections[i] || '';
+        } else if (theme.allowMultiSelect) {
+          // 多选模式
+          value = App.multiSelections[i]?.join(', ') || '';
+        } else {
+          // 单选模式
+          value = App.selections[i] || '';
+        }
+        
+        return `${t.name}: ${value}`;
+      }).join('\n');
       
       document.getElementById('result').innerHTML = `
         <pre>${result}</pre>
@@ -157,6 +181,7 @@
     reset: function() {
       App.currentStep = 0;
       App.selections = {};
+      App.multiSelections = {};
       this.renderThemeNav();
       this.renderCurrentStep();
       document.getElementById('result').innerHTML = '';
@@ -183,6 +208,7 @@
     renderCurrentStep: function() {
       const container = document.getElementById('steps');
       const theme = App.themes[App.currentStep];
+      const stepIndex = App.currentStep;
       
       if (!theme) {
         container.innerHTML = '<div class="step">暫無可用主題</div>';
@@ -192,27 +218,51 @@
       let optionsHTML = '';
       
       if (theme.is_text_input) {
-        // 纯文字输入模式
+        // 纯文字输入模式 - 忽略多选和自定义
         optionsHTML = `
           <input type="text" class="text-input" 
-                 value="${App.selections[App.currentStep] || ''}"
+                 value="${App.selections[stepIndex] || ''}"
                  oninput="UI.handleInput(event)">
         `;
+      } else if (theme.allowMultiSelect) {
+        // 多选模式
+        const selectedOptions = App.multiSelections[stepIndex] || [];
+        
+        optionsHTML = `
+          <div class="multi-select-options">
+            ${theme.options.map(opt => `
+              <div class="option ${selectedOptions.includes(opt) ? 'selected' : ''}" 
+                   data-value="${opt}"
+                   onclick="UI.toggleMultiOption('${opt}')">${opt}</div>
+            `).join('')}
+          </div>
+        `;
+        
+        // 如果允许自定义输入，添加自定义输入框
+        if (theme.allow_custom) {
+          optionsHTML += `
+            <div class="custom-input">
+              <input type="text" 
+                     placeholder="自定義輸入 (選項將以逗號分隔)"
+                     value="${selectedOptions.join(', ') || ''}"
+                     oninput="UI.handleMultiCustomInput(event)">
+            </div>
+          `;
+        }
       } else {
-        // 选项模式
+        // 单选模式
         optionsHTML = theme.options.map(opt => `
-          <div class="option ${App.selections[App.currentStep] === opt ? 'selected' : ''}" 
+          <div class="option ${App.selections[stepIndex] === opt ? 'selected' : ''}" 
                onclick="UI.selectOption('${opt}')">${opt}</div>
         `).join('');
         
         // 如果允许自定义输入，添加自定义输入框
         if (theme.allow_custom) {
-          const customValue = App.selections[App.currentStep] || '';
           optionsHTML += `
             <div class="custom-input">
               <input type="text" 
                      placeholder="自定義輸入"
-                     value="${customValue}"
+                     value="${App.selections[stepIndex] || ''}"
                      oninput="UI.handleCustomInput(event)">
             </div>
           `;
@@ -227,6 +277,30 @@
           </div>
         </div>
       `;
+    },
+    
+    toggleMultiOption: function(option) {
+      const stepIndex = App.currentStep;
+      if (!App.multiSelections[stepIndex]) {
+        App.multiSelections[stepIndex] = [];
+      }
+      
+      const index = App.multiSelections[stepIndex].indexOf(option);
+      if (index >= 0) {
+        // 已选择，移除
+        App.multiSelections[stepIndex].splice(index, 1);
+      } else {
+        // 未选择，添加
+        App.multiSelections[stepIndex].push(option);
+      }
+      
+      this.renderCurrentStep();
+    },
+    
+    handleMultiCustomInput: function(e) {
+      const value = e.target.value;
+      App.multiSelections[App.currentStep] = value.split(',').map(v => v.trim()).filter(v => v);
+      this.renderCurrentStep();
     },
     
     handleCustomInput: function(e) {
@@ -341,6 +415,7 @@
           .filter(o => o.trim()),
         allow_custom: document.getElementById('allowCustom').checked,
         is_text_input: document.getElementById('isTextInput').checked,
+        allowMultiSelect: document.getElementById('allowMultiSelect').checked,
         sort_order: App.themes.length
       };
 
@@ -418,6 +493,9 @@
     clearThemeForm() {
       document.getElementById('newThemeName').value = '';
       document.getElementById('newThemeOptions').value = '';
+      document.getElementById('allowCustom').checked = false;
+      document.getElementById('isTextInput').checked = false;
+      document.getElementById('allowMultiSelect').checked = false;
       App.editingTheme = null;
     },
 
@@ -439,6 +517,7 @@
           <h4>${t.name}</h4>
           <p>選項：${t.options?.join(', ') || '無'}</p>
           <p>自定義：${t.allow_custom ? '允許' : '不允許'}</p>
+          <p>多選：${t.allowMultiSelect ? '允許' : '不允許'}</p>
           <p>模式：${t.is_text_input ? '文字輸入' : '選項選擇'}</p>
           <p>排序：${t.sort_order}</p>
           <div class="button-group">
@@ -481,6 +560,7 @@
       document.getElementById('newThemeOptions').value = theme.options.join('\n');
       document.getElementById('allowCustom').checked = theme.allow_custom;
       document.getElementById('isTextInput').checked = theme.is_text_input;
+      document.getElementById('allowMultiSelect').checked = theme.allowMultiSelect || false;
       App.editingTheme = id;
     }
   };
